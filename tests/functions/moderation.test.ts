@@ -66,6 +66,18 @@ describe("moderation (kickPlayer / setLobbyLocked)", () => {
     expect(await readRoom<PlayerEntry>(pin, `players/${p.uid}`)).toMatchObject({ name: "Geç" });
   });
 
+  it("startGame replaces blocked names and suffixes duplicates", async () => {
+    await newGame();
+    await adminJoin(pin, "pa", "Ali");
+    await adminJoin(pin, "pb", "ALİ");
+    await adminJoin(pin, "pc", "s1kt1r");
+    await host.call("startGame", { pin });
+    const players = await readRoom<Record<string, PlayerEntry>>(pin, "players");
+    expect(players.pa.name).toBe("Ali");
+    expect(players.pb.name).toBe("ALİ (2)");
+    expect(players.pc.name).toBe("Oyuncu 1");
+  });
+
   it("startGame keeps the earliest maxPlayers players instead of failing", async () => {
     // the emulator runs with club.game.maxPlayers; joining that many is too slow, so this is
     // covered by the planStart unit test — here we only check that a normal start keeps everyone.

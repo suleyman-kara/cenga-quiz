@@ -159,6 +159,10 @@ describe("RTDB: joining (players/{uid} write)", () => {
     ["html", "<b>x</b>"],
     ["newline", "Ali\nVeli"],
     ["other unicode letter", "Zoë"],
+    ["leading space", " Ali"],
+    ["trailing space", "Ali "],
+    ["double space", "Ali  Veli"],
+    ["only a space", " "],
   ])("rejects invalid name: %s", async (_label, name) => {
     await seed();
     await assertFails(join(OUTSIDER, name));

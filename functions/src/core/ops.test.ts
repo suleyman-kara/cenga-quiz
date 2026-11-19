@@ -37,6 +37,21 @@ describe("planStart", () => {
     expect(r.state).toEqual({ phase: "question", qIndex: 0, startedAt: 10_000, endsAt: 20_000, updatedAt: 10_000 });
     expect(r.question?.index).toBe(0);
   });
+  it("sanitizes names in the same update: blocked → generated, duplicates suffixed", () => {
+    const r = lobbyRoom({ p1: "Ali", p2: "ali", p3: "orospu" });
+    r.players!.p2.joinedAt = 1600;
+    const patch = planStart(r, { ...host, now: 1 });
+    expect(patch["players/p2/name"]).toBe("ali (2)");
+    expect(patch["players/p3/name"]).toBe("Oyuncu 1");
+    expect(patch["players/p1/name"]).toBeUndefined();
+  });
+  it("does not rename players removed for capacity", () => {
+    const r = lobbyRoom({ a: "A", b: "B", c: "C", d: "orospu" });
+    r.players!.d.joinedAt = 9999;
+    const patch = planStart(r, { ...host, now: 1 });
+    expect(patch["players/d"]).toBeNull();
+    expect(patch["players/d/name"]).toBeUndefined();
+  });
   it("requires at least one player", () => {
     expect(errCode(() => planStart(lobbyRoom({}), { ...host, now: 1 }))).toBe("failed-precondition");
   });
