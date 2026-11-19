@@ -83,6 +83,12 @@ describe("HostGame", () => {
     expect(hostCall).toHaveBeenCalledWith("startGame", { pin: "123456" });
   });
 
+  it("lobby: shows a QR code that opens the join page with the PIN", () => {
+    renderHost();
+    const qr = screen.getByRole("img", { name: t("hostGame.qrLabel") });
+    expect(qr.getAttribute("data-url")).toBe(`${window.location.origin}/?pin=123456`);
+  });
+
   it("lobby: a blocked nickname is masked on the projector (data untouched), duplicates are marked", async () => {
     vi.mocked(hooks.usePlayers).mockReturnValue([
       { uid: "u0", name: "Ali", joinedAt: 0 },

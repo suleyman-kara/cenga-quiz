@@ -84,6 +84,8 @@ export const tr: Messages = {
   "leaderboard.points": "{score}",
   "podium.place": "{rank}. sıra",
   "podium.title": "Podyum",
+  "hostGame.qrLabel": "Katılmak için QR kodu",
+  "hostGame.qrHint": "Telefonunun kamerasıyla okut",
   "leaderboard.correct": "{count} doğru",
   "ended.topTitle": "İlk {count}",
 

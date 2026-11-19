@@ -26,6 +26,7 @@ import { Loading } from "../components/Loading";
 import { Leaderboard } from "../components/Leaderboard";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Podium } from "../components/Podium";
+import { JoinQr, joinUrl } from "../components/JoinQr";
 import { club } from "../club.config";
 import { hostCall } from "../firebase";
 import { t } from "../i18n";
@@ -329,9 +330,17 @@ function LobbyStage({
       <div className="stage-lobby__join">
         {meta && <p className="stage-lobby__title">{meta.title}</p>}
         <p className="stage-lobby__url">{t("hostGame.joinAt", { url: window.location.host })}</p>
-        <div className="stage-lobby__ticket" data-locked={meta?.locked || undefined}>
-          <p className="stage-lobby__pin-label">{t("hostGame.pin")}</p>
-          <p className="stage-lobby__pin">{pin}</p>
+        <div className="stage-lobby__entry">
+          <div className="stage-lobby__ticket" data-locked={meta?.locked || undefined}>
+            <p className="stage-lobby__pin-label">{t("hostGame.pin")}</p>
+            <p className="stage-lobby__pin">{pin}</p>
+          </div>
+          {!meta?.locked && (
+            <figure className="stage-lobby__qr">
+              <JoinQr url={joinUrl(window.location.origin, pin)} />
+              <figcaption>{t("hostGame.qrHint")}</figcaption>
+            </figure>
+          )}
         </div>
         {meta?.locked && (
           <p className="stage-lobby__locked" role="status">

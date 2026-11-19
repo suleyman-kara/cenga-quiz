@@ -82,6 +82,8 @@ export const en = {
   "leaderboard.points": "{score}",
   "podium.place": "Place {rank}",
   "podium.title": "Podium",
+  "hostGame.qrLabel": "QR code to join",
+  "hostGame.qrHint": "Scan with your phone camera",
   "leaderboard.correct": "{count} correct",
   "ended.topTitle": "Top {count}",
 

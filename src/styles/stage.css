@@ -1086,3 +1086,44 @@ li[data-duplicate] {
 .stage-ended__top .leaderboard__row::before {
   animation-delay: calc(3.8s + var(--i, 0) * 0.06s);
 }
+
+/* ---------- lobi: PIN + QR ---------- */
+.stage-lobby__entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px 32px;
+}
+
+/* QR varken PIN ve QR yan yana sığsın: sol sütun genişler, PIN yüksekliğe göre de ölçeklenir */
+.stage-lobby:has(.stage-lobby__qr) {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 40px;
+}
+
+.stage-lobby:has(.stage-lobby__qr) .stage-lobby__pin {
+  font-size: clamp(3.5rem, min(10vw, 20vh), 11rem);
+}
+
+.stage-lobby:has(.stage-lobby__qr) .stage-lobby__ticket {
+  padding: 18px 40px 24px;
+}
+
+.stage-lobby__qr {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--stage-soft);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.join-qr {
+  display: block;
+  width: clamp(120px, min(14vw, 26vh), 240px);
+  height: auto;
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 40px -24px color-mix(in srgb, var(--color-primary) 60%, transparent);
+}
