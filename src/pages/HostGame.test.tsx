@@ -338,6 +338,16 @@ describe("HostGame", () => {
     expect(callsOf("kickPlayer")).toHaveLength(0);
   });
 
+  it("players panel: cancelling the bulk confirmation keeps the selection", async () => {
+    renderHost();
+    await userEvent.click(screen.getByText(t("hostGame.playersPanel", { count: 2 })));
+    await userEvent.click(screen.getByRole("checkbox", { name: t("hostGame.select", { name: "Oyuncu 1" }) }));
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kickSelected", { count: 1 }) }));
+    await userEvent.click(screen.getByRole("button", { name: t("common.cancel") }));
+    expect(screen.getByRole("checkbox", { name: t("hostGame.select", { name: "Oyuncu 1" }) })).toBeChecked();
+    expect(callsOf("kickPlayers")).toHaveLength(0);
+  });
+
   it("players panel is available in the lobby too (bulk moderation of spam names)", async () => {
     renderHost();
     expect(screen.getByText(t("hostGame.playersPanel", { count: 2 }))).toBeInTheDocument();

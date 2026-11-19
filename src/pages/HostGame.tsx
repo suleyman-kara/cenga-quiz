@@ -466,10 +466,8 @@ function PlayersPanel({
             type="button"
             className="btn btn--danger btn--small stage-panel__bulk"
             disabled={busy || selected.length === 0}
-            onClick={() => {
-              onKickMany(selected);
-              setPicked(new Set());
-            }}
+            // kicked players drop out of `selected` on their own; a cancelled dialog keeps the choice
+            onClick={() => onKickMany(selected)}
           >
             {t("hostGame.kickSelected", { count: selected.length })}
           </button>
