@@ -1,2 +1,58 @@
-rules_version = "2";
-service cloud.firestore { match /databases/{db}/documents { match /{d=**} { allow read, write: if false; } } }
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAnonymous() {
+      return request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // A non-anonymous user with a verified email listed in allowedHosts.
+    function isAllowedHost() {
+      return signedIn()
+        && !isAnonymous()
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('email', null) is string
+        && exists(/databases/$(database)/documents/allowedHosts/$(request.auth.token.email));
+    }
+
+    function isOwner(data) {
+      return signedIn() && !isAnonymous() && data.ownerUid == request.auth.uid;
+    }
+
+    function validQuiz(d) {
+      return d.ownerUid is string
+        && d.title is string && d.title.size() >= 1 && d.title.size() <= 120
+        && d.questions is list && d.questions.size() >= 1 && d.questions.size() <= 100;
+    }
+
+    // Users may only check whether their own email is an allowed host. Writes: Admin SDK only.
+    match /allowedHosts/{email} {
+      allow get: if signedIn() && !isAnonymous()
+        && request.auth.token.get('email', null) == email;
+    }
+
+    // Quizzes contain correct answers: owner only, never players.
+    match /quizzes/{quizId} {
+      allow read, delete: if isOwner(resource.data);
+      allow create: if isOwner(request.resource.data)
+        && isAllowedHost()
+        && validQuiz(request.resource.data);
+      allow update: if isOwner(resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && validQuiz(request.resource.data);
+    }
+
+    // liveGames/{pin}: Cloud Functions only (no rule => denied).
+
+    match /gameResults/{id} {
+      allow read: if signedIn() && resource.data.hostUid == request.auth.uid;
+    }
+
+    // Everything else is denied by default.
+  }
+}
