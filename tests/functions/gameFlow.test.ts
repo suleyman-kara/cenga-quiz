@@ -14,7 +14,8 @@ import {
   signInGoogle,
   type Client,
 } from "./helpers";
-import type { GameResultDoc, GameState, Leaderboard, PlayerScore, PublicQuestion, RevealData } from "../../shared/types";
+import { club } from "../../src/club.config";
+import type { GameMeta, GameResultDoc, GameState, Leaderboard, PlayerScore, PublicQuestion, RevealData } from "../../shared/types";
 
 let host: Client;
 let pin: string;
@@ -162,8 +163,15 @@ describe("game flow (host callables)", () => {
     expect((await readRoom<Leaderboard>(pin, "leaderboard")).top[0].name).toBe("Ali");
     expect((await adminFs().doc(`liveGames/${pin}`).get()).exists).toBe(false);
 
+    const meta = await readRoom<GameMeta>(pin, "meta");
+    expect(resultId).toBe(`${pin}_${meta.createdAt}`);
+    expect(meta.archived).toBe(true);
+    expect((await adminFs().collection("gameResults").get()).size).toBe(1);
     const result = (await adminFs().doc(`gameResults/${resultId}`).get()).data() as GameResultDoc;
     expect(result).toMatchObject({ pin, hostUid: host.uid, quizId: "q1", title: "Test Yarışması", playerCount: 3, questionCount: 3 });
+    expect((result.expireAt as unknown as { toMillis(): number }).toMillis()).toBe(
+      result.endedAt + club.game.resultsRetentionDays * 86_400_000,
+    );
     expect(result.results.map((r) => r.uid)).toEqual(["pa", "pc", "pb"]);
     expect(result.results[0]).toEqual({ uid: "pa", name: "Ali", score: sc.pa.score, rank: 1, correctCount: 3 });
     expect(result.results.map((r) => r.rank)).toEqual([1, 2, 3]);

@@ -16,8 +16,15 @@ describe("classifyRoom", () => {
   it("keeps recently ended rooms", () => {
     expect(classifyRoom(room("ended", now - 29 * MIN), now, opts)).toBe("keep");
   });
-  it("removes rooms ended more than 30 minutes ago", () => {
-    expect(classifyRoom(room("ended", now - 31 * MIN), now, opts)).toBe("remove");
+  it("removes rooms ended (and archived) more than 30 minutes ago", () => {
+    expect(classifyRoom(room("ended", now - 31 * MIN, { "meta/archived": true }), now, opts)).toBe("remove");
+  });
+  it("archives an ended room that was never archived (e.g. endGame crashed) before removing it", () => {
+    expect(classifyRoom(room("ended", now - 31 * MIN), now, opts)).toBe("archive-remove");
+  });
+  it("never archives an already archived abandoned room again", () => {
+    const r = room("reveal", now - 7 * HOUR, { "scores/p1": { score: 1 }, "meta/archived": true });
+    expect(classifyRoom(r, now, opts)).toBe("remove");
   });
   it("keeps active rooms", () => {
     expect(classifyRoom(room("question", now - 5 * HOUR), now, opts)).toBe("keep");

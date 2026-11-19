@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildGameResult, hasScores } from "./archive";
+import { buildGameResult, hasScores, resultIdFor } from "./archive";
 import { lobbyRoom } from "./fixtures";
 import type { Room } from "./room";
 
@@ -19,7 +19,7 @@ describe("buildGameResult", () => {
       ...lobbyRoom({ p1: "Ali", p2: "Ayşe", p3: "Can", p4: "Deniz" }),
       scores: { p1: s(500, 1), p2: s(1500, 2), p3: s(500, 1) },
     };
-    const doc = buildGameResult(room, { pin: "123456", now: 9999 });
+    const doc = buildGameResult(room, { pin: "123456", now: 9999, retentionDays: 2 });
     expect(doc).toEqual({
       pin: "123456",
       hostUid: "host",
@@ -29,6 +29,7 @@ describe("buildGameResult", () => {
       endedAt: 9999,
       playerCount: 4,
       questionCount: 2,
+      expireAt: new Date(9999 + 2 * 86_400_000),
       results: [
         { uid: "p2", name: "Ayşe", score: 1500, rank: 1, correctCount: 2 },
         { uid: "p1", name: "Ali", score: 500, rank: 2, correctCount: 1 },
@@ -39,7 +40,7 @@ describe("buildGameResult", () => {
   });
 
   it("handles a room without players", () => {
-    const doc = buildGameResult(lobbyRoom({}), { pin: "123456", now: 1 });
+    const doc = buildGameResult(lobbyRoom({}), { pin: "123456", now: 1, retentionDays: 365 });
     expect(doc.results).toEqual([]);
     expect(doc.playerCount).toBe(0);
   });
@@ -49,5 +50,12 @@ describe("hasScores", () => {
   it("is true only when some score node exists", () => {
     expect(hasScores(lobbyRoom())).toBe(false);
     expect(hasScores({ ...lobbyRoom(), scores: { p1: s(0, 0) } })).toBe(true);
+  });
+});
+
+describe("resultIdFor", () => {
+  it("is deterministic per room: pin + meta.createdAt", () => {
+    expect(resultIdFor("123456", lobbyRoom())).toBe("123456_1000");
+    expect(resultIdFor("123456", {})).toBe("123456_0");
   });
 });
