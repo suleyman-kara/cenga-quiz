@@ -6,14 +6,22 @@ import { displayName } from "../host/displayNames";
 interface Props {
   entries: LeaderboardEntry[];
   limit?: number;
+  /** also show each player's correct-answer count */
+  detailed?: boolean;
+  /** accessible name of the list (defaults to the leaderboard title) */
+  label?: string;
+  className?: string;
 }
 
-export function Leaderboard({ entries, limit = 5 }: Props) {
+export function Leaderboard({ entries, limit = 10, detailed = false, label, className }: Props) {
   const rows = entries.slice(0, limit);
   if (rows.length === 0) return <p className="muted">{t("leaderboard.empty")}</p>;
   const top = Math.max(1, rows[0]?.score ?? 1);
+  const classes = ["leaderboard", rows.length > 5 && "leaderboard--dense", detailed && "leaderboard--detailed", className]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <ol className="leaderboard" aria-label={t("leaderboard.title")}>
+    <ol className={classes} aria-label={label ?? t("leaderboard.title")}>
       {rows.map((e, i) => (
         <li
           key={`${e.rank}-${e.name}-${i}`}
@@ -23,6 +31,9 @@ export function Leaderboard({ entries, limit = 5 }: Props) {
         >
           <span className="leaderboard__rank">{e.rank}</span>
           <span className="leaderboard__name">{displayName(e.name, i + 1).label}</span>
+          {detailed && typeof e.correctCount === "number" && (
+            <span className="leaderboard__correct">{t("leaderboard.correct", { count: e.correctCount })}</span>
+          )}
           <span className="leaderboard__score">{e.score}</span>
         </li>
       ))}

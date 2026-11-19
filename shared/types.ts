@@ -184,6 +184,8 @@ export interface LeaderboardEntry {
   name: string;
   score: number;
   rank: number;
+  /** correct answers so far (detailed lists); optional for older rooms */
+  correctCount?: number;
 }
 
 export interface Leaderboard {

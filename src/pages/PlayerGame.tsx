@@ -23,6 +23,7 @@ import { Countdown, remaining, remainingSeconds } from "../components/Countdown"
 import { Loading } from "../components/Loading";
 import { StreakBadge } from "../components/StreakBadge";
 import { GapLine } from "../components/GapLine";
+import { Leaderboard as LeaderboardList } from "../components/Leaderboard";
 import { club } from "../club.config";
 import { t } from "../i18n";
 
@@ -120,7 +121,7 @@ export function PlayerGame() {
         body = <RankView score={score} leaderboard={leaderboard} />;
         break;
       case "ended":
-        body = <EndedView score={score} onLeave={leave} />;
+        body = <EndedView score={score} leaderboard={leaderboard} onLeave={leave} />;
         break;
     }
 
@@ -432,7 +433,15 @@ function RankView({
   );
 }
 
-function EndedView({ score, onLeave }: { score: PlayerScore | null | undefined; onLeave: () => void }) {
+function EndedView({
+  score,
+  leaderboard,
+  onLeave,
+}: {
+  score: PlayerScore | null | undefined;
+  leaderboard: Leaderboard | null | undefined;
+  onLeave: () => void;
+}) {
   const final = club.finalScreen[club.locale];
   return (
     <div className="ended center stack">
@@ -444,6 +453,17 @@ function EndedView({ score, onLeave }: { score: PlayerScore | null | undefined; 
       )}
       <h1 className="headline">{final.title}</h1>
       <p className="lead muted">{final.message}</p>
+      {leaderboard && leaderboard.top.length > 0 && (
+        <section className="ended__top">
+          <h2 className="ended__top-title">{t("ended.topTitle", { count: club.game.leaderboardSize })}</h2>
+          <LeaderboardList
+            entries={leaderboard.top}
+            limit={club.game.leaderboardSize}
+            detailed
+            label={t("ended.topTitle", { count: club.game.leaderboardSize })}
+          />
+        </section>
+      )}
       <ul className="social">
         {club.social.map((s) => (
           <li key={s.url}>

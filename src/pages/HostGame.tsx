@@ -224,7 +224,16 @@ function BigScreen({ pin }: { pin: string }) {
         body = (
           <div className="stage-ended stack center">
             <Logo className="stage-ended__logo" />
-            <Podium entries={leaderboard?.top ?? []} />
+            <div className="stage-ended__results">
+              <Podium entries={leaderboard?.top ?? []} />
+              <Leaderboard
+                entries={leaderboard?.top ?? []}
+                limit={club.game.leaderboardSize}
+                detailed
+                label={t("ended.topTitle", { count: club.game.leaderboardSize })}
+                className="stage-ended__top"
+              />
+            </div>
             <div className="stage-ended__text">
               <h1 className="stage-title">{final.title}</h1>
               <p className="stage-lead">{final.message}</p>

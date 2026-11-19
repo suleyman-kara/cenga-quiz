@@ -155,7 +155,12 @@ export function scoreQuestion(input: ScoreQuestionInput): ScoreQuestionResult {
   // Order explicitly rather than via object key order (integer-like keys would be reordered by JS).
   const top: LeaderboardEntry[] = orderUids(scores, players)
     .slice(0, Math.max(0, leaderboardSize))
-    .map((uid) => ({ name: players[uid].name, score: scores[uid].score, rank: scores[uid].rank }));
+    .map((uid) => ({
+      name: players[uid].name,
+      score: scores[uid].score,
+      rank: scores[uid].rank,
+      correctCount: scores[uid].correctCount,
+    }));
 
   return { scores, counts, leaderboard: { top, playerCount: Object.keys(players).length } };
 }

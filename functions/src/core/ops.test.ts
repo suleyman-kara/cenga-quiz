@@ -107,8 +107,8 @@ describe("planReveal", () => {
     expect(out.scores?.p2).toMatchObject({ score: 0, lastAnswered: true, lastCorrect: false, rank: 2 });
     expect(out.leaderboard).toEqual({
       top: [
-        { name: "Ali", score: 950, rank: 1 },
-        { name: "Ayşe", score: 0, rank: 2 },
+        { name: "Ali", score: 950, rank: 1, correctCount: 1 },
+        { name: "Ayşe", score: 0, rank: 2, correctCount: 0 },
       ],
       playerCount: 2,
     });
@@ -185,8 +185,8 @@ describe("planEnd", () => {
     const out = applyPatch(lobbyRoom(), planEnd(lobbyRoom(), { ...host, now: 2 })) as Room;
     expect(out.leaderboard).toEqual({
       top: [
-        { name: "Ali", score: 0, rank: 1 },
-        { name: "Ayşe", score: 0, rank: 1 },
+        { name: "Ali", score: 0, rank: 1, correctCount: 0 },
+        { name: "Ayşe", score: 0, rank: 1, correctCount: 0 },
       ],
       playerCount: 2,
     });
@@ -209,7 +209,7 @@ describe("planKick", () => {
   it("rewrites an existing leaderboard without the kicked player", () => {
     const r = revealed(); // p1 950, p2 0
     const out = applyPatch(r, planKick(r, { ...host, now: 1 }, "p1")) as Room;
-    expect(out.leaderboard).toEqual({ top: [{ name: "Ayşe", score: 0, rank: 1 }], playerCount: 1 });
+    expect(out.leaderboard).toEqual({ top: [{ name: "Ayşe", score: 0, rank: 1, correctCount: 0 }], playerCount: 1 });
     expect(out.scores?.p2.rank).toBe(1);
   });
   it("works in the lobby (no leaderboard written) and for unknown uids", () => {
@@ -303,7 +303,7 @@ describe("planKickMany", () => {
     });
     const out = applyPatch(r, patch) as Room;
     expect(Object.keys(out.players!)).toEqual(["p2"]);
-    expect(out.leaderboard).toEqual({ top: [{ name: "Ayşe", score: 0, rank: 1 }], playerCount: 1 });
+    expect(out.leaderboard).toEqual({ top: [{ name: "Ayşe", score: 0, rank: 1, correctCount: 0 }], playerCount: 1 });
     expect(out.scores?.p2.rank).toBe(1);
   });
   it("leaderboard rebuild ignores previously banned uids still present in scores", () => {

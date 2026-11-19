@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { GameState, PlayerScore, PublicQuestion } from "../../shared/types";
@@ -163,6 +163,21 @@ describe("PlayerGame", () => {
     expect(screen.getByText(t("player.finalRank", { rank: 3 }))).toBeInTheDocument();
     expect(screen.getByText(club.finalScreen[club.locale].title)).toBeInTheDocument();
     expect(screen.getByText(club.finalScreen[club.locale].message)).toBeInTheDocument();
+  });
+
+  it("ended: also shows the overall top list", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("ended"));
+    vi.mocked(hooks.useLeaderboard).mockReturnValue({
+      top: [
+        { name: "Ali", score: 3000, rank: 1, correctCount: 3 },
+        { name: "Veli", score: 2000, rank: 2, correctCount: 2 },
+      ],
+      playerCount: 5,
+    });
+    renderPlay();
+    const list = screen.getByRole("list", { name: t("ended.topTitle", { count: 10 }) });
+    expect(within(list).getByText("Ali")).toBeInTheDocument();
+    expect(within(list).getByText("Veli")).toBeInTheDocument();
   });
 
   it("shows a not-found message when the game does not exist", () => {

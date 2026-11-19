@@ -83,6 +83,9 @@ export const tr: Messages = {
   "leaderboard.empty": "Henüz puan yok.",
   "leaderboard.points": "{score}",
   "podium.place": "{rank}. sıra",
+  "podium.title": "Podyum",
+  "leaderboard.correct": "{count} doğru",
+  "ended.topTitle": "İlk {count}",
 
   "app.configTitle": "Yapılandırma eksik",
   "app.configBody": "Bu sürümde Firebase ayarları yok, bu yüzden oyun başlatılamıyor. Düzenleyiciler: `npm run configure` çalıştırıp yeniden derleyin ve yayınlayın.",

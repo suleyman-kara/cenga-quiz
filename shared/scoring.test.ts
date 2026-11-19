@@ -387,7 +387,7 @@ describe("scoreQuestion", () => {
       input({ players: { a: player("A") }, prevScores: { gone: score({ score: 5000 }) } }),
     );
     expect(Object.keys(res.scores)).toEqual(["a"]);
-    expect(res.leaderboard.top).toEqual([{ name: "A", score: 0, rank: 1 }]);
+    expect(res.leaderboard.top).toEqual([{ name: "A", score: 0, rank: 1, correctCount: 0 }]);
   });
 
   it.each([
@@ -463,9 +463,9 @@ describe("scoreQuestion", () => {
     expect(res.scores.u4.rank).toBe(3);
     expect(res.leaderboard).toEqual({
       top: [
-        { name: "Cem", score: 1500, rank: 1 },
-        { name: "Bora", score: 1100, rank: 2 },
-        { name: "Ayşe", score: 1000, rank: 3 },
+        { name: "Cem", score: 1500, rank: 1, correctCount: 0 },
+        { name: "Bora", score: 1100, rank: 2, correctCount: 1 },
+        { name: "Ayşe", score: 1000, rank: 3, correctCount: 1 },
       ],
       playerCount: 4,
     });

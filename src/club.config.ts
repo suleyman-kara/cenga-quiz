@@ -193,7 +193,7 @@ export const club: ClubConfig = {
     maxPoints: 1000,
     // +40, +70, +90, +100: her adımda artış 10 azalır; soru başına en fazla 1000 + 100 = 1100
     streakBonus: { enabled: true, steps: [40, 70, 90, 100] },
-    leaderboardSize: 5,
+    leaderboardSize: 10,
     maxPlayers: 300,
     abandonedAfterHours: 6,
     leadInMs: 3000,

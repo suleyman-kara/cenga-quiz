@@ -1036,3 +1036,53 @@ li[data-duplicate] {
     animation: none;
   }
 }
+
+/* ---------- ilk 10: sıkışık ve ayrıntılı sıralama ---------- */
+.leaderboard--dense {
+  gap: 6px;
+}
+
+.leaderboard--dense .leaderboard__row {
+  padding: 6px 20px;
+  font-size: clamp(1rem, 1.6vw, 1.4rem);
+}
+
+.leaderboard--detailed .leaderboard__row {
+  grid-template-columns: 3.4rem 1fr auto auto;
+}
+
+.leaderboard__correct {
+  font-size: 0.75em;
+  font-weight: 500;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* oyun sonu: podyum + ilk 10 (geniş ekranda yan yana) */
+.stage-ended__results {
+  width: 100%;
+  max-width: 1600px;
+  display: grid;
+  gap: 24px;
+  align-items: end;
+}
+
+@media (min-width: 1000px) {
+  .stage-ended__results {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+.stage-ended__top {
+  width: 100%;
+  animation: rise 0.6s 3.6s var(--ease-out) both;
+}
+
+.stage-ended__top .leaderboard__row {
+  animation-delay: calc(3.6s + var(--i, 0) * 0.06s);
+}
+
+.stage-ended__top .leaderboard__row::before {
+  animation-delay: calc(3.8s + var(--i, 0) * 0.06s);
+}

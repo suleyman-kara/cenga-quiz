@@ -53,7 +53,7 @@ export function Podium({ entries }: { entries: LeaderboardEntry[] }) {
   return (
     <div className="podium-wrap">
       {top.length > 0 && <Confetti />}
-      <ol className="podium">
+      <ol className="podium" aria-label={t("podium.title")}>
         {top.map((e, i) => (
           <li key={`${e.rank}-${e.name}-${i}`} className={`podium__step podium__step--${i + 1}`}>
             <span className="podium__who">

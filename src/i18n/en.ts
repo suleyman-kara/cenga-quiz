@@ -81,6 +81,9 @@ export const en = {
   "leaderboard.empty": "No scores yet.",
   "leaderboard.points": "{score}",
   "podium.place": "Place {rank}",
+  "podium.title": "Podium",
+  "leaderboard.correct": "{count} correct",
+  "ended.topTitle": "Top {count}",
 
   "app.configTitle": "Configuration missing",
   "app.configBody": "This version has no Firebase settings, so the game cannot start. Organizers: run `npm run configure`, then build and deploy again.",

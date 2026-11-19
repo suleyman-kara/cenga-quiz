@@ -19,7 +19,7 @@ export function rankedResults(room: Room): ResultRow[] {
 
 export function leaderboardFrom(rows: ResultRow[], size: number): Leaderboard {
   return {
-    top: rows.slice(0, Math.max(0, size)).map(({ name, score, rank }) => ({ name, score, rank })),
+    top: rows.slice(0, Math.max(0, size)).map(({ name, score, rank, correctCount }) => ({ name, score, rank, correctCount })),
     playerCount: rows.length,
   };
 }

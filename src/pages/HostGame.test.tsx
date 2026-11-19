@@ -360,6 +360,33 @@ describe("HostGame", () => {
     expect(screen.getByText(t("common.computing"))).toBeInTheDocument();
   });
 
+  it("ended: detailed top 10 next to the podium, with correct counts", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(2), phase: "ended" });
+    const top = Array.from({ length: 11 }, (_, i) => ({
+      name: `Oyuncu${i + 1}`,
+      score: 1000 - i * 10,
+      rank: i + 1,
+      correctCount: 8 - (i % 3),
+    }));
+    vi.mocked(hooks.useLeaderboard).mockReturnValue({ top, playerCount: 11 });
+    renderHost();
+    const list = screen.getByRole("list", { name: t("ended.topTitle", { count: 10 }) });
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows).toHaveLength(10);
+    expect(within(rows[3]).getByText("Oyuncu4")).toBeInTheDocument();
+    expect(within(rows[3]).getByText(t("leaderboard.correct", { count: 8 }))).toBeInTheDocument();
+    expect(within(list).queryByText("Oyuncu11")).not.toBeInTheDocument();
+  });
+
+  it("leaderboard phase shows up to 10 rows", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "leaderboard" });
+    const top = Array.from({ length: 12 }, (_, i) => ({ name: `Oyuncu${i + 1}`, score: 100 - i, rank: i + 1 }));
+    vi.mocked(hooks.useLeaderboard).mockReturnValue({ top, playerCount: 12 });
+    renderHost();
+    expect(screen.getByText("Oyuncu10")).toBeInTheDocument();
+    expect(screen.queryByText("Oyuncu11")).not.toBeInTheDocument();
+  });
+
   it("ended: podium with top 3, club final text and logo", () => {
     vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(2), phase: "ended" });
     vi.mocked(hooks.useLeaderboard).mockReturnValue({
@@ -372,9 +399,10 @@ describe("HostGame", () => {
       playerCount: 4,
     });
     renderHost();
-    expect(screen.getByText("Ali")).toBeInTheDocument();
-    expect(screen.getByText("Can")).toBeInTheDocument();
-    expect(screen.queryByText("Dördüncü")).not.toBeInTheDocument();
+    const podium = screen.getByRole("list", { name: t("podium.title") });
+    expect(within(podium).getByText("Ali")).toBeInTheDocument();
+    expect(within(podium).getByText("Can")).toBeInTheDocument();
+    expect(within(podium).queryByText("Dördüncü")).not.toBeInTheDocument();
     expect(screen.getByText(club.finalScreen[club.locale].title)).toBeInTheDocument();
     expect(screen.getByAltText(club.logo.alt)).toBeInTheDocument();
   });
