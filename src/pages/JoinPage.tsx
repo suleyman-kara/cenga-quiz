@@ -5,6 +5,7 @@ import { NAME_MAX, isValidName, normalizeName } from "../../shared/names";
 import { checkGame, joinGame } from "../game/actions";
 import { loadSession, saveSession } from "../game/session";
 import { Layout } from "../components/Layout";
+import { ChoiceShape } from "../components/ChoiceShape";
 import { club } from "../club.config";
 import { t } from "../i18n";
 
@@ -63,31 +64,53 @@ export function JoinPage() {
 
   return (
     <Layout>
-      <section className="join">
-        <p className="join__tagline">{club.tagline[club.locale]}</p>
+      <section className="join" data-step={step}>
+        <div className="join__hero">
+          <span className="shape-row" aria-hidden="true">
+            {club.choices.map((c, i) => (
+              <span key={c.id} className="shape-row__item" data-choice={i}>
+                <ChoiceShape index={i} />
+              </span>
+            ))}
+          </span>
+          <h1 className="join__tagline">{club.tagline[club.locale]}</h1>
+        </div>
         {step === "pin" ? (
           <form className="card join__card" onSubmit={submitPin} noValidate>
             <label className="field__label" htmlFor="pin">
               {t("join.pinLabel")}
             </label>
-            <input
-              id="pin"
-              className="pin-input"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoComplete="one-time-code"
-              enterKeyHint="go"
-              maxLength={6}
-              placeholder="••••••"
-              value={pin}
-              aria-describedby="pin-hint"
-              aria-invalid={pinWrong || undefined}
-              onChange={(e) => {
-                setPin(digitsOnly(e.target.value));
-                setError(null);
-              }}
-              autoFocus
-            />
+            <div className="pin-field" data-invalid={pinWrong || undefined}>
+              <input
+                id="pin"
+                className="pin-field__input"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
+                enterKeyHint="go"
+                maxLength={6}
+                value={pin}
+                aria-describedby="pin-hint"
+                aria-invalid={pinWrong || undefined}
+                onChange={(e) => {
+                  setPin(digitsOnly(e.target.value));
+                  setError(null);
+                }}
+                autoFocus
+              />
+              <span className="pin-field__cells" aria-hidden="true">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <span
+                    key={i}
+                    className="pin-field__cell"
+                    data-filled={i < pin.length || undefined}
+                    data-active={i === Math.min(pin.length, 5) || undefined}
+                  >
+                    {pin[i] ?? ""}
+                  </span>
+                ))}
+              </span>
+            </div>
             <p id="pin-hint" className="field__hint">
               {pinWrong ? <span className="field__error">{t("join.pinInvalid")}</span> : t("join.pinHint")}
             </p>
@@ -96,13 +119,18 @@ export function JoinPage() {
                 {error}
               </p>
             )}
-            <button type="submit" className="btn btn--primary btn--block" disabled={!pinOk || busy}>
+            <button
+              type="submit"
+              className="btn btn--primary btn--block"
+              disabled={!pinOk || busy}
+              aria-busy={busy || undefined}
+            >
               {busy ? t("join.checking") : t("join.continue")}
             </button>
           </form>
         ) : (
           <form className="card join__card" onSubmit={submitName} noValidate>
-            <p className="chip">{t("join.pinChip", { pin })}</p>
+            <p className="chip join__pin-chip">{t("join.pinChip", { pin })}</p>
             <label className="field__label" htmlFor="nickname">
               {t("join.nameLabel")}
             </label>
@@ -129,7 +157,7 @@ export function JoinPage() {
                 {error}
               </p>
             )}
-            <button type="submit" className="btn btn--primary btn--block" disabled={busy}>
+            <button type="submit" className="btn btn--primary btn--block" disabled={busy} aria-busy={busy || undefined}>
               {busy ? t("join.joining") : t("join.join")}
             </button>
             <button
