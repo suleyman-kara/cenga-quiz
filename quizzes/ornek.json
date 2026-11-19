@@ -1,0 +1,54 @@
+{
+  "title": "Teknoloji ve Bilim Turu",
+  "description": "Genel teknoloji ve bilim kültürü üzerine 8 soruluk ısınma yarışması.",
+  "questions": [
+    {
+      "text": "Bilgisayarlarda bilgiyi ikili sistemde tutan en küçük birimin adı nedir?",
+      "options": ["Bayt", "Bit", "Piksel", "Hertz"],
+      "correct": 1,
+      "seconds": 20
+    },
+    {
+      "text": "Işık, boşlukta sesten daha hızlı yayılır.",
+      "options": ["Doğru", "Yanlış"],
+      "correct": 0,
+      "seconds": 10
+    },
+    {
+      "text": "Güneş Sistemi'nin en büyük gezegeni hangisidir?",
+      "options": ["Satürn", "Jüpiter", "Neptün"],
+      "correct": 1,
+      "seconds": 15
+    },
+    {
+      "text": "Web sayfalarının yapısını tanımlamak için kullanılan işaretleme dilinin kısaltması nedir?",
+      "options": ["HTML", "HTTP", "SQL", "USB"],
+      "correct": 0,
+      "seconds": 20
+    },
+    {
+      "text": "Suyun kimyasal formülü nedir?",
+      "options": ["CO2", "H2O", "O2"],
+      "correct": 1,
+      "seconds": 15
+    },
+    {
+      "text": "DNA'nın açılımında yer alan 'asit' kelimesi, molekülün bir protein olduğunu gösterir.",
+      "options": ["Doğru", "Yanlış"],
+      "correct": 1,
+      "seconds": 15
+    },
+    {
+      "text": "Aşağıdakilerden hangisi bir programlama dili değildir?",
+      "options": ["Python", "Rust", "JPEG", "Kotlin"],
+      "correct": 2,
+      "seconds": 20
+    },
+    {
+      "text": "Dünya'nın doğal uydusu Ay'dan Dünya'ya ışığın ulaşması yaklaşık ne kadar sürer?",
+      "options": ["Yaklaşık 1 saniye", "Yaklaşık 8 dakika", "Yaklaşık 1 saat"],
+      "correct": 0,
+      "seconds": 20
+    }
+  ]
+}
