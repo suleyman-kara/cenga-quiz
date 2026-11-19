@@ -12,7 +12,7 @@ import { getDatabase as getClientDb, connectDatabaseEmulator, type Database as C
 import { initializeApp as initAdmin, getApps as getAdminApps, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getDatabase, ServerValue, type Database } from "firebase-admin/database";
-import type { CallableContract, CallableName, Quiz } from "../../shared/types";
+import { HOST_CALLABLE, type HostAction, type HostActionMap, type Quiz } from "../../shared/types";
 
 export const PROJECT_ID = "demo-club-quiz";
 export const RTDB_NS = `${PROJECT_ID}-default-rtdb`;
@@ -53,7 +53,10 @@ export interface Client {
   app: FirebaseApp;
   uid: string;
   db: ClientDb;
-  call<N extends CallableName>(name: N, data: CallableContract[N]["req"]): Promise<CallableContract[N]["res"]>;
+  /** Host action through the single `host` dispatcher callable. */
+  call<A extends HostAction>(action: A, data: HostActionMap[A]["req"]): Promise<HostActionMap[A]["res"]>;
+  /** Any callable by name with a raw payload (for contract tests). */
+  callRaw(name: string, data: unknown): Promise<unknown>;
 }
 
 function wrap(app: FirebaseApp, uid: string): Client {
@@ -65,9 +68,12 @@ function wrap(app: FirebaseApp, uid: string): Client {
     app,
     uid,
     db,
-    async call(name, data) {
-      const res = await httpsCallable(fns, name)(data);
+    async call(action, data) {
+      const res = await httpsCallable(fns, HOST_CALLABLE)({ action, ...data });
       return res.data as never;
+    },
+    async callRaw(name, data) {
+      return (await httpsCallable(fns, name)(data)).data;
     },
   };
 }

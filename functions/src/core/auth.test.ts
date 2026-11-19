@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId, parseUid, parseBool, parseQIndex } from "./auth";
+import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId, parseUid, parseBool, parseQIndex, parseHostAction } from "./auth";
 import { GameError } from "./errors";
 
 function code(fn: () => unknown): string | undefined {
@@ -85,4 +85,15 @@ describe("parseQIndex", () => {
   it.each([{}, { qIndex: -1 }, { qIndex: 1.5 }, { qIndex: "1" }, { qIndex: null }, { qIndex: 1e9 }])("rejects %j", (d) => {
     expect(code(() => parseQIndex(d))).toBe("invalid-argument");
   });
+});
+
+describe("parseHostAction", () => {
+  it.each(["createGame", "startGame", "reveal", "showLeaderboard", "nextQuestion", "endGame", "kickPlayer", "setLobbyLocked"])(
+    "accepts %s",
+    (action) => expect(parseHostAction({ action })).toBe(action),
+  );
+  it.each([undefined, null, {}, { action: "" }, { action: "toString" }, { action: "__proto__" }, { action: "drop" }, { action: 1 }])(
+    "rejects %j",
+    (d) => expect(code(() => parseHostAction(d))).toBe("invalid-argument"),
+  );
 });
