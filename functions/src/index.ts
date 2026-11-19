@@ -30,6 +30,8 @@ export const reveal = callable("reveal", game.reveal);
 export const showLeaderboard = callable("showLeaderboard", game.showLeaderboard);
 export const nextQuestion = callable("nextQuestion", game.nextQuestion);
 export const endGame = callable("endGame", game.endGame);
+export const kickPlayer = callable("kickPlayer", game.kickPlayer);
+export const setLobbyLocked = callable("setLobbyLocked", game.setLobbyLocked);
 
 export const cleanupGames = onSchedule(
   { schedule: "every 30 minutes", timeZone: "Europe/Istanbul", region: FUNCTIONS_REGION },

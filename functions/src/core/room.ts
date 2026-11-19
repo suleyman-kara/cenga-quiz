@@ -31,6 +31,8 @@ export interface Room {
   answers?: Record<string, Record<string, AnswerEntry>> | (Record<string, AnswerEntry> | undefined)[];
   scores?: Record<string, PlayerScore>;
   leaderboard?: Leaderboard;
+  /** kicked uids (true) — rules reject their joins */
+  banned?: Record<string, true>;
 }
 
 /** Multi-path update relative to games/{pin}; null deletes. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId } from "./auth";
+import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId, parseUid, parseBool } from "./auth";
 import { GameError } from "./errors";
 
 function code(fn: () => unknown): string | undefined {
@@ -55,4 +55,24 @@ describe("parseQuizId", () => {
       expect(code(() => parseQuizId(d))).toBe("invalid-argument");
     },
   );
+});
+
+describe("parseUid", () => {
+  it("accepts an auth uid", () => expect(parseUid({ uid: "aB3_xYz-09" })).toBe("aB3_xYz-09"));
+  it.each([undefined, {}, { uid: "" }, { uid: "a/b" }, { uid: "a.b" }, { uid: "a#b" }, { uid: "$x" }, { uid: "[x]" }, { uid: 7 }, { uid: "x".repeat(129) }])(
+    "rejects %j",
+    (d) => {
+      expect(code(() => parseUid(d))).toBe("invalid-argument");
+    },
+  );
+});
+
+describe("parseBool", () => {
+  it("accepts booleans", () => {
+    expect(parseBool({ locked: true }, "locked")).toBe(true);
+    expect(parseBool({ locked: false }, "locked")).toBe(false);
+  });
+  it.each([{}, { locked: "true" }, { locked: 1 }, null])("rejects %j", (d) => {
+    expect(code(() => parseBool(d, "locked"))).toBe("invalid-argument");
+  });
 });

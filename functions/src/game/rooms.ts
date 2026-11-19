@@ -98,6 +98,11 @@ export async function writePatch(pin: string, patch: Patch): Promise<void> {
   await db.ref(`games/${pin}`).update(full);
 }
 
+/** Plain multi-path update relative to games/{pin} (leaves any lock alone). */
+export async function updateRoom(pin: string, patch: Patch): Promise<void> {
+  await (await database()).ref(`games/${pin}`).update(patch);
+}
+
 /** Private quiz snapshot (incl. correct answers) for a live game. */
 export async function loadLiveQuiz(pin: string): Promise<Quiz | undefined> {
   const snap = await (await firestore()).doc(`liveGames/${pin}`).get();

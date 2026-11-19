@@ -2,7 +2,7 @@
  * Pure game transitions. Each `plan*` validates the room (as read inside an RTDB
  * transaction) and returns the multi-path patch to apply to games/{pin}.
  */
-import type { GameState, Phase, Quiz } from "../../../shared/types";
+import type { GameState, Phase, PlayerEntry, Quiz } from "../../../shared/types";
 import { scoreQuestion } from "../../../shared/scoring";
 import { GameError } from "./errors";
 import { assertTransition, type GameAction } from "./transitions";
@@ -35,15 +35,23 @@ function idleState(phase: Phase, qIndex: number, now: number): GameState {
   return { phase, qIndex, startedAt: 0, endsAt: 0, updatedAt: now };
 }
 
+/** uids in join order (joinedAt, then uid for determinism). */
+export function joinOrder(players: Record<string, PlayerEntry>): string[] {
+  return Object.keys(players).sort(
+    (a, b) => (players[a].joinedAt ?? 0) - (players[b].joinedAt ?? 0) || (a < b ? -1 : a > b ? 1 : 0),
+  );
+}
+
 export function planStart(room: Room | null | undefined, ctx: OpContext): Patch {
-  guard(room, ctx, "start");
+  const r = guard(room, ctx, "start");
   const quiz = needQuiz(ctx);
-  const count = Object.keys(room!.players ?? {}).length;
-  if (count < 1) throw new GameError("failed-precondition", "Başlatmak için en az bir oyuncu gerekli.");
-  if (count > ctx.config.maxPlayers) {
-    throw new GameError("failed-precondition", `En fazla ${ctx.config.maxPlayers} oyuncu katılabilir.`);
-  }
-  return questionPatch(quiz, 0, ctx.now, ctx.config.defaultQuestionSeconds);
+  const players = r.players ?? {};
+  const order = joinOrder(players);
+  if (order.length < 1) throw new GameError("failed-precondition", "Başlatmak için en az bir oyuncu gerekli.");
+  const patch: Patch = {};
+  // Over capacity: keep the earliest joiners rather than failing the start.
+  for (const uid of order.slice(Math.max(0, ctx.config.maxPlayers))) patch[`players/${uid}`] = null;
+  return { ...patch, ...questionPatch(quiz, 0, ctx.now, ctx.config.defaultQuestionSeconds) };
 }
 
 export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch {
@@ -93,4 +101,28 @@ export function planEnd(room: Room | null | undefined, ctx: OpContext): Patch {
   const patch: Patch = { state: idleState("ended", r.state.qIndex, ctx.now) };
   if (!r.leaderboard) patch.leaderboard = leaderboardFrom(rankedResults(r), ctx.config.leaderboardSize);
   return patch;
+}
+
+/** Removes a player (and their score) and bans their uid from rejoining. */
+export function planKick(room: Room | null | undefined, ctx: OpContext, target: string): Patch {
+  const r = guard(room, ctx, "kick");
+  const patch: Patch = { [`players/${target}`]: null, [`scores/${target}`]: null, [`banned/${target}`]: true };
+  if (r.leaderboard) {
+    // Keep the big screen clean: rebuild the leaderboard (and ranks) without the kicked player.
+    const players = { ...(r.players ?? {}) };
+    delete players[target];
+    const scores = { ...(r.scores ?? {}) };
+    delete scores[target];
+    const rows = rankedResults({ ...r, players, scores });
+    for (const row of rows) {
+      if (scores[row.uid] && scores[row.uid].rank !== row.rank) patch[`scores/${row.uid}/rank`] = row.rank;
+    }
+    patch.leaderboard = leaderboardFrom(rows, ctx.config.leaderboardSize);
+  }
+  return patch;
+}
+
+export function planSetLobbyLocked(room: Room | null | undefined, ctx: OpContext, locked: boolean): Patch {
+  guard(room, ctx, "lockLobby");
+  return { "meta/locked": locked };
 }

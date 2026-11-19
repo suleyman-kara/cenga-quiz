@@ -9,6 +9,8 @@ const allowed: Record<GameAction, Phase[]> = {
   showLeaderboard: ["reveal"],
   next: ["reveal", "leaderboard"],
   end: ["lobby", "question", "reveal", "leaderboard"],
+  kick: ["lobby", "question", "reveal", "leaderboard"],
+  lockLobby: ["lobby", "question", "reveal", "leaderboard"],
 };
 const phases: Phase[] = ["lobby", "question", "reveal", "leaderboard", "ended"];
 

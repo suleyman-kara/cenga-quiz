@@ -42,3 +42,18 @@ export function parseQuizId(data: unknown): string {
   }
   return id;
 }
+
+/** A Firebase Auth uid usable as an RTDB key. */
+export function parseUid(data: unknown): string {
+  const uid = field(data, "uid");
+  if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
+    throw new GameError("invalid-argument", "Geçersiz oyuncu kimliği.");
+  }
+  return uid;
+}
+
+export function parseBool(data: unknown, key: string): boolean {
+  const v = field(data, key);
+  if (typeof v !== "boolean") throw new GameError("invalid-argument", `Geçersiz değer: ${key}.`);
+  return v;
+}

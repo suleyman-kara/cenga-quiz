@@ -161,6 +161,8 @@ export interface CallableContract {
   showLeaderboard: { req: { pin: string }; res: { ok: true } };
   nextQuestion: { req: { pin: string }; res: { ok: true } };
   endGame: { req: { pin: string }; res: { ok: true; resultId: string } };
+  kickPlayer: { req: { pin: string; uid: string }; res: { ok: true } };
+  setLobbyLocked: { req: { pin: string; locked: boolean }; res: { ok: true; locked: boolean } };
 }
 export type CallableName = keyof CallableContract;
 

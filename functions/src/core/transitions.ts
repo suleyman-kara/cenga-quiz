@@ -1,7 +1,7 @@
 import type { Phase } from "../../../shared/types";
 import { GameError } from "./errors";
 
-export type GameAction = "start" | "reveal" | "showLeaderboard" | "next" | "end";
+export type GameAction = "start" | "reveal" | "showLeaderboard" | "next" | "end" | "kick" | "lockLobby";
 
 const FROM: Record<GameAction, readonly Phase[]> = {
   start: ["lobby"],
@@ -9,6 +9,8 @@ const FROM: Record<GameAction, readonly Phase[]> = {
   showLeaderboard: ["reveal"],
   next: ["reveal", "leaderboard"],
   end: ["lobby", "question", "reveal", "leaderboard"],
+  kick: ["lobby", "question", "reveal", "leaderboard"],
+  lockLobby: ["lobby", "question", "reveal", "leaderboard"],
 };
 
 /** Throws failed-precondition when `action` is not allowed in `phase`. */
