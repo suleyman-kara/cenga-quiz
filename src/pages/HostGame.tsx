@@ -24,6 +24,7 @@ import { ChoiceShape } from "../components/ChoiceShape";
 import { Countdown, remainingSeconds } from "../components/Countdown";
 import { Loading } from "../components/Loading";
 import { Leaderboard } from "../components/Leaderboard";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Podium } from "../components/Podium";
 import { club } from "../club.config";
 import { hostCall } from "../firebase";
@@ -72,13 +73,15 @@ function BigScreen({ pin }: { pin: string }) {
     [showError],
   );
 
-  const kick = useCallback(
-    (p: PlayerListItem) => {
-      if (!window.confirm(t("hostGame.kickConfirm", { name: p.name }))) return;
-      void run("kickPlayer", { pin, uid: p.uid });
-    },
-    [pin, run],
-  );
+  // In-app confirmation: window.confirm would freeze timers and listeners while open, then let
+  // the kick and a pending auto-reveal fire in the same tick.
+  const [kickTarget, setKickTarget] = useState<PlayerListItem | null>(null);
+  const kick = useCallback((p: PlayerListItem) => setKickTarget(p), []);
+  const confirmKick = () => {
+    const p = kickTarget;
+    setKickTarget(null);
+    if (p) void run("kickPlayer", { pin, uid: p.uid });
+  };
 
   const inQuestion = state?.phase === "question";
   const started = !!state && now >= state.startedAt;
@@ -275,6 +278,14 @@ function BigScreen({ pin }: { pin: string }) {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={!!kickTarget}
+        message={kickTarget ? t("hostGame.kickConfirm", { name: kickTarget.name }) : ""}
+        confirmLabel={t("hostGame.kickConfirmOk")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={confirmKick}
+        onCancel={() => setKickTarget(null)}
+      />
     </Layout>
   );
 }

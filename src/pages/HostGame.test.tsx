@@ -89,16 +89,50 @@ describe("HostGame", () => {
     expect(screen.getByRole("button", { name: t("hostGame.start") })).toBeDisabled();
   });
 
-  it("lobby: × removes a player after confirmation", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+  it("lobby: × asks in an in-app dialog (no window.confirm); Cancel keeps, Remove kicks", async () => {
+    const confirm = vi.spyOn(window, "confirm");
     renderHost();
     const kick = screen.getByRole("button", { name: t("hostGame.kick", { name: "Oyuncu 1" }) });
     await userEvent.click(kick);
+    const dialog = screen.getByRole("alertdialog", { name: t("hostGame.kickConfirm", { name: "Oyuncu 1" }) });
+    await userEvent.click(within(dialog).getByRole("button", { name: t("common.cancel") }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(callsOf("kickPlayer")).toHaveLength(0);
     await userEvent.click(kick);
-    expect(confirm).toHaveBeenLastCalledWith(t("hostGame.kickConfirm", { name: "Oyuncu 1" }));
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kickConfirmOk") }));
     expect(hostCall).toHaveBeenCalledWith("kickPlayer", { pin: "123456", uid: "u1" });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(confirm).not.toHaveBeenCalled();
     confirm.mockRestore();
+  });
+
+  it("lobby: Escape closes the kick dialog without kicking", async () => {
+    renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kick", { name: "Oyuncu 0" }) }));
+    expect(screen.getByRole("button", { name: t("common.cancel") })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(callsOf("kickPlayer")).toHaveLength(0);
+  });
+
+  it("auto-reveal waits while a kick is in flight and fires after it finishes", async () => {
+    let finishKick!: () => void;
+    vi.mocked(hostCall).mockImplementation(((action: string) =>
+      action === "kickPlayer" ? new Promise((r) => (finishKick = () => r({ ok: true }))) : Promise.resolve({ ok: true })) as never);
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), phase: "question" });
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    vi.mocked(hooks.useServerNow).mockReturnValue(10_000);
+    const { rerender } = renderHost();
+    await userEvent.click(screen.getByText(t("hostGame.playersPanel", { count: 2 })));
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kick", { name: "Oyuncu 0" }) }));
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kickConfirmOk") }));
+    expect(callsOf("kickPlayer")).toHaveLength(1);
+    vi.mocked(hooks.useServerNow).mockReturnValue(20_400);
+    rerender(ui());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(callsOf("reveal")).toHaveLength(0);
+    finishKick();
+    await waitFor(() => expect(callsOf("reveal")).toHaveLength(1));
   });
 
   it("lobby: lock toggle calls setLobbyLocked and shows the locked state", async () => {
@@ -242,14 +276,13 @@ describe("HostGame", () => {
   });
 
   it("mid-game: the players panel can remove a player", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "leaderboard" });
     renderHost();
     const panel = screen.getByText(t("hostGame.playersPanel", { count: 2 })).closest("details")!;
     await userEvent.click(within(panel).getByText(t("hostGame.playersPanel", { count: 2 })));
     await userEvent.click(within(panel).getByRole("button", { name: t("hostGame.kick", { name: "Oyuncu 0" }) }));
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kickConfirmOk") }));
     expect(hostCall).toHaveBeenCalledWith("kickPlayer", { pin: "123456", uid: "u0" });
-    confirm.mockRestore();
   });
 
   it("shows a 'calculating' hint while a transition holds the lock", () => {
