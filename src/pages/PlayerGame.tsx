@@ -12,7 +12,7 @@ import {
   useReveal,
   useServerNow,
 } from "../game/hooks";
-import { submitAnswer } from "../game/actions";
+import { fetchOwnAnswer, submitAnswer } from "../game/actions";
 import { useConnectionLost } from "../game/connection";
 import { answeredChoice, clearSession, loadSession, markAnswered } from "../game/session";
 import { isPermissionDenied } from "../errors";
@@ -153,6 +153,9 @@ type Submission =
   | { kind: "failed" }
   | { kind: "rejected" };
 
+/** A write neither confirmed nor refused after this long is checked against the server. */
+export const SEND_VERIFY_MS = 8000;
+
 /** PERMISSION_DENIED within the last second is the deadline (clock skew), not a retryable glitch. */
 function isTooLate(err: unknown, state: GameState, now: number): boolean {
   return isPermissionDenied(err) && state.endsAt - now < 1000;
@@ -184,12 +187,40 @@ function QuestionView({
   const nowRef = useRef(now);
   nowRef.current = now;
   const alive = useRef(true);
+  const verifyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     alive.current = true;
     return () => {
       // A new question/phase while pending: the answer counts as not sent (nothing persisted).
       alive.current = false;
+      clearTimeout(verifyTimer.current);
     };
+  }, []);
+
+  /** Asks the server whether our answer is recorded; if so, shows it as sent. Resolves to found. */
+  const verify = async (): Promise<boolean> => {
+    let choice: number | null = null;
+    try {
+      choice = await fetchOwnAnswer(pin, state.qIndex);
+    } catch {
+      return false;
+    }
+    if (choice === null) return false;
+    markAnswered(pin, state.qIndex, choice);
+    if (alive.current) setSub({ kind: "sent", choice });
+    return true;
+  };
+
+  // Reloaded before markAnswered ran (or storage unavailable): the server may still have it.
+  useEffect(() => {
+    if (answeredChoice(pin, state.qIndex) !== null) return;
+    void fetchOwnAnswer(pin, state.qIndex)
+      .then((choice) => {
+        if (choice === null || !alive.current) return;
+        markAnswered(pin, state.qIndex, choice);
+        setSub((cur) => (cur.kind === "sent" ? cur : { kind: "sent", choice }));
+      })
+      .catch(() => undefined);
   }, []);
 
   const leadIn = now < state.startedAt;
@@ -198,25 +229,42 @@ function QuestionView({
   if (!question) return <Loading />;
 
   const busy = sub.kind === "sending" || sub.kind === "sent" || sub.kind === "rejected";
+  const failedOrRejected = (err: unknown) => {
+    // Past endsAt (typically PERMISSION_DENIED from the rules): the answer was not received.
+    if (remaining(state.endsAt, nowRef.current) === 0 || isTooLate(err, state, nowRef.current)) {
+      setSub({ kind: "rejected" });
+    } else {
+      setSub({ kind: "failed" });
+      setAttempt((a) => a + 1);
+    }
+  };
   const choose = (i: number) => {
     if (busy || timeUp || leadIn) return;
     setSub({ kind: "sending", choice: i });
     navigator.vibrate?.(30);
+    let settled = false;
+    clearTimeout(verifyTimer.current);
+    verifyTimer.current = setTimeout(() => {
+      if (settled || !alive.current) return;
+      void verify().then((found) => {
+        if (!found && !settled && alive.current) failedOrRejected(null);
+      });
+    }, SEND_VERIFY_MS);
     submitAnswer(pin, state.qIndex, i).then(
       () => {
+        settled = true;
+        clearTimeout(verifyTimer.current);
         // Only a write the server accepted counts as answered.
         markAnswered(pin, state.qIndex, i);
         if (alive.current) setSub({ kind: "sent", choice: i });
       },
-      (err: unknown) => {
+      async (err: unknown) => {
+        settled = true;
+        clearTimeout(verifyTimer.current);
         if (!alive.current) return;
-        // Past endsAt (typically PERMISSION_DENIED from the rules): the answer was not received.
-        if (remaining(state.endsAt, nowRef.current) === 0 || isTooLate(err, state, nowRef.current)) {
-          setSub({ kind: "rejected" });
-        } else {
-          setSub({ kind: "failed" });
-          setAttempt((a) => a + 1);
-        }
+        // The write-once rule also denies a resend of an answer the server already accepted.
+        if (isPermissionDenied(err) && (await verify())) return;
+        if (alive.current) failedOrRejected(err);
       },
     );
   };

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { get } from "firebase/database";
-import { checkGame } from "./actions";
+import { checkGame, fetchOwnAnswer } from "./actions";
 
 vi.mock("../firebase", () => ({
   auth: { authStateReady: () => Promise.resolve(), currentUser: { uid: "u1" } },
@@ -64,5 +64,19 @@ describe("checkGame", () => {
   it("ended game is notFound even for former players", async () => {
     room({ [`${P}/meta`]: {}, [`${P}/state`]: { phase: "ended" }, [`${P}/players/u1`]: { name: "A" } });
     expect(await checkGame("123456")).toEqual({ kind: "notFound" });
+  });
+});
+
+describe("fetchOwnAnswer", () => {
+  beforeEach(() => vi.mocked(get).mockReset());
+
+  it("returns the server's recorded choice for the player's own answer", async () => {
+    room({ [`${P}/answers/2/u1`]: { choice: 3, at: 1 } });
+    expect(await fetchOwnAnswer("123456", 2)).toBe(3);
+  });
+
+  it("null when the server has no answer", async () => {
+    room({});
+    expect(await fetchOwnAnswer("123456", 2)).toBeNull();
   });
 });

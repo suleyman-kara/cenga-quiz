@@ -54,3 +54,16 @@ export async function submitAnswer(pin: string, qIndex: number, choice: number):
   const entry: ServerStamped<AnswerEntry, "at"> = { choice, at: serverTimestamp() };
   await set(ref(db, paths.answer(pin, qIndex, uid)), entry);
 }
+
+/**
+ * The player's OWN recorded answer for `qIndex` (rules allow reading answers/{q}/{uid} by that
+ * uid), or null. Used to confirm an answer whose acknowledgement was lost (e.g. the SDK resent
+ * an accepted write and the write-once rule denied the duplicate, or the page reloaded).
+ */
+export async function fetchOwnAnswer(pin: string, qIndex: number): Promise<number | null> {
+  const uid = await ensureUid();
+  const snap = await get(ref(db, paths.answer(pin, qIndex, uid)));
+  if (!snap.exists()) return null;
+  const choice = (snap.val() as Partial<AnswerEntry>).choice;
+  return typeof choice === "number" ? choice : null;
+}

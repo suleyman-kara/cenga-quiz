@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -7,11 +7,11 @@ import { translate } from "../i18n";
 import { club } from "../club.config";
 import { PlayerGame } from "./PlayerGame";
 import * as hooks from "../game/hooks";
-import { submitAnswer } from "../game/actions";
+import { fetchOwnAnswer, submitAnswer } from "../game/actions";
 import { saveSession } from "../game/session";
 
 vi.mock("../firebase", () => ({ call: vi.fn() }));
-vi.mock("../game/actions", () => ({ checkGame: vi.fn(), joinGame: vi.fn(), submitAnswer: vi.fn() }));
+vi.mock("../game/actions", () => ({ checkGame: vi.fn(), joinGame: vi.fn(), submitAnswer: vi.fn(), fetchOwnAnswer: vi.fn() }));
 vi.mock("../game/hooks", () => ({
   usePlayerUid: vi.fn(),
   useGameState: vi.fn(),
@@ -75,6 +75,7 @@ describe("PlayerGame", () => {
     vi.mocked(hooks.useMyScore).mockReturnValue(score());
     vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
     vi.mocked(submitAnswer).mockReset().mockResolvedValue(undefined);
+    vi.mocked(fetchOwnAnswer).mockReset().mockResolvedValue(null);
   });
 
   it("sends players without a session for this PIN back to the join screen", async () => {
@@ -282,5 +283,57 @@ describe("PlayerGame", () => {
     vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
     renderPlay();
     expect(screen.getByText(t("player.correct")).closest('[role="status"]')).not.toBeNull();
+  });
+  describe("answer verification (server accepted, ack lost)", () => {
+    const denied = () => Object.assign(new Error("PERMISSION_DENIED: Permission denied"), { code: "PERMISSION_DENIED" });
+    afterEach(() => vi.useRealTimers());
+
+    it("PERMISSION_DENIED but the server has our answer: shows it as sent (with the server's choice)", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(submitAnswer).mockRejectedValue(denied());
+      renderPlay();
+      vi.mocked(fetchOwnAnswer).mockResolvedValue(1);
+      await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+      expect(await screen.findByText(t("player.answerLocked"))).toBeInTheDocument();
+      expect(screen.queryByText(t("player.sendFailed"))).not.toBeInTheDocument();
+      expect(fetchOwnAnswer).toHaveBeenCalledWith("123456", 0);
+      expect(localStorage.getItem("quiz.answered.123456.0")).toBe("1");
+    });
+
+    it("after a reload without the local mark, restores the answer the server already has", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(fetchOwnAnswer).mockResolvedValue(2);
+      renderPlay();
+      expect(await screen.findByText(t("player.answerLocked"))).toBeInTheDocument();
+      expect(screen.getByText("Bursa", { selector: ".locked__choice" })).toBeInTheDocument();
+      for (const b of screen.getAllByRole("button", { name: /İzmir|Ankara|Bursa/ })) expect(b).toBeDisabled();
+    });
+
+    it("a write still pending after 8 s is verified; if absent, offers a retry", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(submitAnswer).mockReturnValue(new Promise<void>(() => {}));
+      renderPlay();
+      await act(async () => {});
+      vi.mocked(fetchOwnAnswer).mockClear();
+      await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+      expect(screen.getByText(t("player.sending"))).toBeInTheDocument();
+      await act(async () => void (await vi.advanceTimersByTimeAsync(8_000)));
+      expect(fetchOwnAnswer).toHaveBeenCalledTimes(1);
+      expect(await screen.findByText(t("player.sendFailed"))).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Bursa/ })).toBeEnabled();
+    });
+
+    it("a write still pending after 8 s that the server did record shows as sent", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(submitAnswer).mockReturnValue(new Promise<void>(() => {}));
+      renderPlay();
+      await act(async () => {});
+      vi.mocked(fetchOwnAnswer).mockResolvedValue(1);
+      await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+      await act(async () => void (await vi.advanceTimersByTimeAsync(8_000)));
+      expect(await screen.findByText(t("player.answerLocked"))).toBeInTheDocument();
+    });
   });
 });
