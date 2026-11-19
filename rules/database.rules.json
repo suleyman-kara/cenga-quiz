@@ -6,9 +6,9 @@
       "$pin": {
         "meta": { ".read": "auth != null" },
         "state": { ".read": "auth != null" },
-        "question": { ".read": "auth != null" },
-        "reveal": { ".read": "auth != null" },
-        "leaderboard": { ".read": "auth != null" },
+        "question": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
+        "reveal": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
+        "leaderboard": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
         "players": {
           ".read": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
           ".indexOn": ["joinedAt"],
@@ -39,6 +39,10 @@
               "$other": { ".validate": false }
             }
           }
+        },
+        "banned": {
+          ".read": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
+          "$uid": { ".read": "auth != null && auth.uid === $uid" }
         },
         "scores": {
           ".read": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",

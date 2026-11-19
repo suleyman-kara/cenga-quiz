@@ -6,12 +6,16 @@
  * games/{pin}/
  *   meta:                 GameMeta                (Functions write; any signed-in user reads)
  *   state:                GameState               (Functions write; any signed-in user reads)
- *   question:             PublicQuestion          (Functions write; NO correct answer)
- *   reveal:               RevealData              (Functions write)
- *   players/{uid}:        PlayerEntry             (player writes own, only in lobby; host reads all)
- *   answers/{qIndex}/{uid}: AnswerEntry           (player writes own once; host reads; player reads own)
+ *   question:             PublicQuestion          (Functions write; NO correct answer; host + joined players read)
+ *   reveal:               RevealData              (Functions write; host + joined players read)
+ *   players/{uid}:        PlayerEntry             (player creates own once / deletes own, only in an unlocked
+ *                                                  lobby and while state.lock is absent; never renamed by the
+ *                                                  client; host reads all)
+ *   answers/{qIndex}/{uid}: AnswerEntry           (player writes own once, startedAt <= now < endsAt, no lock;
+ *                                                  host reads; player reads own)
  *   scores/{uid}:         PlayerScore             (Functions write; player reads own; host reads all)
- *   leaderboard:          Leaderboard             (Functions write; top N only)
+ *   leaderboard:          Leaderboard             (Functions write; top N only; host + joined players read)
+ *   banned/{uid}:         true                    (Functions write on kick; that uid + host read)
  *
  * ── Firestore ──────────────────────────────────────────────────────────────
  * allowedHosts/{email}    { addedAt }             (admin/console/script only; user may read own)
