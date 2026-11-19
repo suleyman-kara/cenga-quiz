@@ -321,6 +321,28 @@ describe("HostGame", () => {
     expect(hostCall).toHaveBeenCalledWith("kickPlayer", { pin: "123456", uid: "u0" });
   });
 
+  it("players panel: multi-select + 'remove selected' kicks in bulk with kickPlayers after confirmation", async () => {
+    vi.mocked(hooks.usePlayers).mockReturnValue(players(3));
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "leaderboard" });
+    renderHost();
+    const panel = screen.getByText(t("hostGame.playersPanel", { count: 3 })).closest("details")!;
+    await userEvent.click(within(panel).getByText(t("hostGame.playersPanel", { count: 3 })));
+    const bulk = within(panel).getByRole("button", { name: t("hostGame.kickSelected", { count: 0 }) });
+    expect(bulk).toBeDisabled();
+    await userEvent.click(within(panel).getByRole("checkbox", { name: t("hostGame.select", { name: "Oyuncu 0" }) }));
+    await userEvent.click(within(panel).getByRole("checkbox", { name: t("hostGame.select", { name: "Oyuncu 2" }) }));
+    await userEvent.click(within(panel).getByRole("button", { name: t("hostGame.kickSelected", { count: 2 }) }));
+    const dialog = screen.getByRole("alertdialog", { name: t("hostGame.kickManyConfirm", { count: 2 }) });
+    await userEvent.click(within(dialog).getByRole("button", { name: t("hostGame.kickConfirmOk") }));
+    expect(hostCall).toHaveBeenCalledWith("kickPlayers", { pin: "123456", uids: ["u0", "u2"] });
+    expect(callsOf("kickPlayer")).toHaveLength(0);
+  });
+
+  it("players panel is available in the lobby too (bulk moderation of spam names)", async () => {
+    renderHost();
+    expect(screen.getByText(t("hostGame.playersPanel", { count: 2 }))).toBeInTheDocument();
+  });
+
   it("shows a 'calculating' hint while a transition holds the lock", () => {
     vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), phase: "reveal", lock: { by: "showLeaderboard", at: 4_800 } });
     vi.mocked(hooks.useQuestion).mockReturnValue(question());

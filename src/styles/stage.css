@@ -916,23 +916,48 @@ li[data-duplicate] {
 }
 
 /* opens upwards over the stage so the control row keeps its height */
-.stage-panel__list {
+.stage-panel__pop {
   position: absolute;
   left: 0;
   bottom: calc(100% + 8px);
-  min-width: 260px;
-  list-style: none;
-  margin: 0;
-  padding: 8px 14px;
+  min-width: 300px;
+  padding: 8px 14px 12px;
   background: var(--color-stage);
   border: 1px solid var(--stage-line);
   border-radius: var(--radius-md);
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stage-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   max-height: 50vh;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.stage-panel__pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.stage-panel__pick input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-danger);
+}
+
+.stage-panel__bulk {
+  align-self: flex-start;
 }
 
 .stage-panel__list li {

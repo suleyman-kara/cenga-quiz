@@ -78,12 +78,15 @@ function BigScreen({ pin }: { pin: string }) {
 
   // In-app confirmation: window.confirm would freeze timers and listeners while open, then let
   // the kick and a pending auto-reveal fire in the same tick.
-  const [kickTarget, setKickTarget] = useState<DisplayPlayer | null>(null);
-  const kick = useCallback((p: DisplayPlayer) => setKickTarget(p), []);
+  const [kickTarget, setKickTarget] = useState<{ one: DisplayPlayer } | { many: string[] } | null>(null);
+  const kick = useCallback((p: DisplayPlayer) => setKickTarget({ one: p }), []);
+  const kickMany = useCallback((uids: string[]) => uids.length > 0 && setKickTarget({ many: uids }), []);
   const confirmKick = () => {
-    const p = kickTarget;
+    const target = kickTarget;
     setKickTarget(null);
-    if (p) void run("kickPlayer", { pin, uid: p.uid });
+    if (!target) return;
+    if ("one" in target) void run("kickPlayer", { pin, uid: target.one.uid });
+    else void run("kickPlayers", { pin, uids: target.many });
   };
 
   const inQuestion = state?.phase === "question";
@@ -239,7 +242,7 @@ function BigScreen({ pin }: { pin: string }) {
     }
 
   const ended = state?.phase === "ended";
-  const midGame = !!state && state.phase !== "lobby" && state.phase !== "ended";
+  const moderating = !!state && state.phase !== "ended";
   return (
     <Layout
       variant="stage"
@@ -274,16 +277,22 @@ function BigScreen({ pin }: { pin: string }) {
             {error}
           </p>
         )}
-        {(controls || midGame) && (
+        {(controls || moderating) && (
           <div className="stage__controls">
-            {midGame && <PlayersPanel players={shown} onKick={kick} busy={busy} />}
+            {moderating && <PlayersPanel players={shown} onKick={kick} onKickMany={kickMany} busy={busy} />}
             {controls}
           </div>
         )}
       </div>
       <ConfirmDialog
         open={!!kickTarget}
-        message={kickTarget ? t("hostGame.kickConfirm", { name: kickTarget.label }) : ""}
+        message={
+          !kickTarget
+            ? ""
+            : "one" in kickTarget
+              ? t("hostGame.kickConfirm", { name: kickTarget.one.label })
+              : t("hostGame.kickManyConfirm", { count: kickTarget.many.length })
+        }
         confirmLabel={t("hostGame.kickConfirmOk")}
         cancelLabel={t("common.cancel")}
         onConfirm={confirmKick}
@@ -407,27 +416,66 @@ function KickButton({
   );
 }
 
-/** Host side panel during the game (moderation without leaving the stage). */
+/**
+ * Host moderation panel (lobby and mid-game): kick one player, or select several and remove them
+ * in one kickPlayers call. The list renders only while open (it can hold hundreds of names).
+ */
 function PlayersPanel({
   players,
   onKick,
+  onKickMany,
   busy,
 }: {
   players: DisplayPlayer[];
   onKick: (p: DisplayPlayer) => void;
+  onKickMany: (uids: string[]) => void;
   busy: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  // players who left / were kicked drop out of the selection automatically
+  const selected = players.filter((p) => picked.has(p.uid)).map((p) => p.uid);
+  const toggle = (uid: string) =>
+    setPicked((cur) => {
+      const next = new Set(cur);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
   return (
-    <details className="stage-panel">
+    <details className="stage-panel" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{t("hostGame.playersPanel", { count: players.length })}</summary>
-      <ul className="stage-panel__list">
-        {players.map((p) => (
-          <li key={p.uid} data-masked={p.masked || undefined} data-duplicate={p.duplicate || undefined}>
-            <PlayerLabel player={p} />
-            <KickButton player={p} onKick={onKick} disabled={busy} />
-          </li>
-        ))}
-      </ul>
+      {open && (
+        <div className="stage-panel__pop">
+          <ul className="stage-panel__list">
+            {players.map((p) => (
+              <li key={p.uid} data-masked={p.masked || undefined} data-duplicate={p.duplicate || undefined}>
+                <label className="stage-panel__pick">
+                  <input
+                    type="checkbox"
+                    checked={picked.has(p.uid)}
+                    onChange={() => toggle(p.uid)}
+                    aria-label={t("hostGame.select", { name: p.label })}
+                  />
+                  <PlayerLabel player={p} />
+                </label>
+                <KickButton player={p} onKick={onKick} disabled={busy} />
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="btn btn--danger btn--small stage-panel__bulk"
+            disabled={busy || selected.length === 0}
+            onClick={() => {
+              onKickMany(selected);
+              setPicked(new Set());
+            }}
+          >
+            {t("hostGame.kickSelected", { count: selected.length })}
+          </button>
+        </div>
+      )}
     </details>
   );
 }
