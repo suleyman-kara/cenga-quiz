@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { CallableName, GameMeta, GameState, PublicQuestion, RevealData } from "../../shared/types";
 import {
@@ -17,6 +17,7 @@ import { Layout } from "../components/Layout";
 import { Logo } from "../components/Logo";
 import { ChoiceShape } from "../components/ChoiceShape";
 import { Countdown, remaining } from "../components/Countdown";
+import { Loading } from "../components/Loading";
 import { Leaderboard } from "../components/Leaderboard";
 import { Podium } from "../components/Podium";
 import { club } from "../club.config";
@@ -75,10 +76,10 @@ function BigScreen({ pin }: { pin: string }) {
   let body: ReactNode;
   let controls: ReactNode = null;
 
-  if (state === undefined) body = <p className="muted center">{t("common.loading")}</p>;
+  if (state === undefined) body = <Loading variant="text" />;
   else if (state === null)
     body = (
-      <div className="center stack">
+      <div className="center stack stage-missing">
         <p className="lead">{t("hostGame.notFound")}</p>
         <Link className="btn btn--primary" to="/host">
           {t("hostGame.backToPanel")}
@@ -127,7 +128,12 @@ function BigScreen({ pin }: { pin: string }) {
           />
         );
         controls = (
-          <button type="button" className="btn btn--primary btn--stage" disabled={busy} onClick={() => void run("showLeaderboard")}>
+          <button
+            type="button"
+            className="btn btn--primary btn--stage"
+            disabled={busy}
+            onClick={() => void run("showLeaderboard")}
+          >
             {t("hostGame.showLeaderboard")}
           </button>
         );
@@ -136,6 +142,7 @@ function BigScreen({ pin }: { pin: string }) {
         const isLast = !!meta && state.qIndex >= meta.questionCount - 1;
         body = (
           <div className="stage-board stack">
+            <QuestionHeader state={state} meta={meta} />
             <h1 className="stage-title">{t("leaderboard.title")}</h1>
             <Leaderboard entries={leaderboard?.top ?? []} limit={club.game.leaderboardSize} />
           </div>
@@ -143,7 +150,12 @@ function BigScreen({ pin }: { pin: string }) {
         controls = (
           <>
             {!isLast && (
-              <button type="button" className="btn btn--primary btn--stage" disabled={busy} onClick={() => void run("nextQuestion")}>
+              <button
+                type="button"
+                className="btn btn--primary btn--stage"
+                disabled={busy}
+                onClick={() => void run("nextQuestion")}
+              >
                 {t("hostGame.next")}
               </button>
             )}
@@ -165,8 +177,10 @@ function BigScreen({ pin }: { pin: string }) {
           <div className="stage-ended stack center">
             <Logo className="stage-ended__logo" />
             <Podium entries={leaderboard?.top ?? []} />
-            <h1 className="stage-title">{final.title}</h1>
-            <p className="stage-lead">{final.message}</p>
+            <div className="stage-ended__text">
+              <h1 className="stage-title">{final.title}</h1>
+              <p className="stage-lead">{final.message}</p>
+            </div>
           </div>
         );
         controls = (
@@ -198,25 +212,52 @@ function BigScreen({ pin }: { pin: string }) {
   );
 }
 
-function LobbyStage({ pin, meta, names }: { pin: string; meta: GameMeta | null | undefined; names: { id: string; name: string }[] }) {
+function LobbyStage({
+  pin,
+  meta,
+  names,
+}: {
+  pin: string;
+  meta: GameMeta | null | undefined;
+  names: { id: string; name: string }[];
+}) {
   return (
     <div className="stage-lobby">
       <div className="stage-lobby__join">
-        {meta && <p className="stage-lead">{meta.title}</p>}
+        {meta && <p className="stage-lobby__title">{meta.title}</p>}
         <p className="stage-lobby__url">{t("hostGame.joinAt", { url: window.location.host })}</p>
-        <p className="stage-lobby__pin-label">{t("hostGame.pin")}</p>
-        <p className="stage-lobby__pin">{pin}</p>
+        <div className="stage-lobby__ticket">
+          <p className="stage-lobby__pin-label">{t("hostGame.pin")}</p>
+          <p className="stage-lobby__pin">{pin}</p>
+        </div>
       </div>
       <div className="stage-lobby__players">
         <p className="stage-lobby__count" aria-live="polite">
           {t("hostGame.players", { count: names.length })}
         </p>
         {names.length === 0 ? (
-          <p className="muted">{t("hostGame.waitingPlayers")}</p>
+          <div className="stage-lobby__empty">
+            <span className="shape-row" aria-hidden="true">
+              {club.choices.map((c, i) => (
+                <span
+                  key={c.id}
+                  className="shape-row__item stage-wait"
+                  data-choice={i}
+                  style={{ "--i": i } as CSSProperties}
+                >
+                  <ChoiceShape index={i} />
+                </span>
+              ))}
+            </span>
+            <p className="muted">{t("hostGame.waitingPlayers")}</p>
+          </div>
         ) : (
           <ul className="name-grid">
-            {names.map((p) => (
-              <li key={p.id}>{p.name}</li>
+            {names.map((p, i) => (
+              <li key={p.id} data-choice={i % club.choices.length}>
+                <ChoiceShape index={i % club.choices.length} />
+                <span>{p.name}</span>
+              </li>
             ))}
           </ul>
         )}
@@ -227,9 +268,20 @@ function LobbyStage({ pin, meta, names }: { pin: string; meta: GameMeta | null |
 
 function QuestionHeader({ state, meta }: { state: GameState; meta: GameMeta | null | undefined }) {
   return (
-    <p className="stage-kicker">
-      {meta ? t("hostGame.questionOf", { n: state.qIndex + 1, total: meta.questionCount }) : t("player.questionN", { n: state.qIndex + 1 })}
-    </p>
+    <div className="stage-kicker">
+      <p>
+        {meta
+          ? t("hostGame.questionOf", { n: state.qIndex + 1, total: meta.questionCount })
+          : t("player.questionN", { n: state.qIndex + 1 })}
+      </p>
+      {meta && meta.questionCount > 1 && (
+        <span className="stage-steps" aria-hidden="true">
+          {Array.from({ length: meta.questionCount }, (_, i) => (
+            <span key={i} data-done={i < state.qIndex || undefined} data-current={i === state.qIndex || undefined} />
+          ))}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -248,7 +300,8 @@ function QuestionStage({
   answered: number;
   total: number;
 }) {
-  if (!question) return <p className="muted center">{t("common.loading")}</p>;
+  if (!question) return <Loading />;
+  const share = total > 0 ? Math.min(1, answered / total) : 0;
   return (
     <div className="stage-question">
       <div className="stage-question__head">
@@ -267,9 +320,12 @@ function QuestionStage({
           </li>
         ))}
       </ul>
-      <p className="stage-answered" aria-live="polite">
-        {t("hostGame.answered", { answered, total })}
-      </p>
+      <div className="stage-answered">
+        <span className="stage-answered__bar" aria-hidden="true">
+          <span style={{ transform: `scaleX(${share})` }} />
+        </span>
+        <p aria-live="polite">{t("hostGame.answered", { answered, total })}</p>
+      </div>
     </div>
   );
 }
@@ -285,7 +341,7 @@ function RevealStage({
   question: PublicQuestion | null;
   reveal: RevealData | null;
 }) {
-  if (!question || !reveal) return <p className="muted center">{t("common.loading")}</p>;
+  if (!question || !reveal) return <Loading />;
   const max = Math.max(1, ...reveal.counts);
   return (
     <div className="stage-reveal">
@@ -295,14 +351,25 @@ function RevealStage({
         {question.options.map((opt, i) => {
           const count = reveal.counts[i] ?? 0;
           return (
-            <li key={i} className="dist__row" data-choice={i} data-correct={i === reveal.correct ? "true" : "false"}>
+            <li
+              key={i}
+              className="dist__row"
+              data-choice={i}
+              data-correct={i === reveal.correct ? "true" : "false"}
+              style={{ "--i": i } as CSSProperties}
+            >
               <div className="dist__bar-wrap">
                 <span className="dist__count">{count}</span>
                 <span className="dist__bar" style={{ height: `${(count / max) * 100}%` }} />
               </div>
               <div className="dist__label">
                 <ChoiceShape index={i} />
-                <span>{opt}</span>
+                <span className="dist__text">{opt}</span>
+                {i === reveal.correct && (
+                  <svg className="dist__check" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                )}
               </div>
             </li>
           );
