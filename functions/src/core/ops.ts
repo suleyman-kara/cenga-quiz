@@ -2,12 +2,13 @@
  * Pure game transitions. Each `plan*` validates the room (as read inside an RTDB
  * transaction) and returns the multi-path patch to apply to games/{pin}.
  */
-import type { GameState, Phase, PlayerEntry, Quiz } from "../../../shared/types";
+import type { GameState, Phase, Quiz } from "../../../shared/types";
 import { scoreQuestion } from "../../../shared/scoring";
 import { GameError } from "./errors";
 import { assertTransition, type GameAction } from "./transitions";
 import { answersFor, canReveal, questionPatch, type GameConfig, type Patch, type Room } from "./room";
 import { leaderboardFrom, rankedResults } from "./archive";
+import { joinOrder, sanitizePlayerNames } from "./sanitize";
 
 export interface OpContext {
   uid: string;
@@ -15,6 +16,8 @@ export interface OpContext {
   config: GameConfig;
   /** private quiz snapshot (liveGames/{pin}); needed by start/next/reveal */
   quiz?: Quiz;
+  /** prefix for generated replacement names ("Oyuncu" → "Oyuncu 3") */
+  namePrefix?: string;
 }
 
 type ActiveRoom = Room & Required<Pick<Room, "meta" | "state">>;
@@ -35,13 +38,6 @@ function idleState(phase: Phase, qIndex: number, now: number): GameState {
   return { phase, qIndex, startedAt: 0, endsAt: 0, updatedAt: now };
 }
 
-/** uids in join order (joinedAt, then uid for determinism). */
-export function joinOrder(players: Record<string, PlayerEntry>): string[] {
-  return Object.keys(players).sort(
-    (a, b) => (players[a].joinedAt ?? 0) - (players[b].joinedAt ?? 0) || (a < b ? -1 : a > b ? 1 : 0),
-  );
-}
-
 export function planStart(room: Room | null | undefined, ctx: OpContext): Patch {
   const r = guard(room, ctx, "start");
   const quiz = needQuiz(ctx);
@@ -50,7 +46,13 @@ export function planStart(room: Room | null | undefined, ctx: OpContext): Patch 
   if (order.length < 1) throw new GameError("failed-precondition", "Başlatmak için en az bir oyuncu gerekli.");
   const patch: Patch = {};
   // Over capacity: keep the earliest joiners rather than failing the start.
-  for (const uid of order.slice(Math.max(0, ctx.config.maxPlayers))) patch[`players/${uid}`] = null;
+  const kept = order.slice(0, Math.max(0, ctx.config.maxPlayers));
+  for (const uid of order.slice(kept.length)) patch[`players/${uid}`] = null;
+  // Final display names: blocked → neutral generated name, duplicates suffixed.
+  const keptPlayers = Object.fromEntries(kept.map((uid) => [uid, players[uid]]));
+  for (const [uid, name] of Object.entries(sanitizePlayerNames(keptPlayers, ctx.namePrefix ?? "Oyuncu"))) {
+    patch[`players/${uid}/name`] = name;
+  }
   return { ...patch, ...questionPatch(quiz, 0, ctx.now, ctx.config.defaultQuestionSeconds) };
 }
 

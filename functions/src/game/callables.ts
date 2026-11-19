@@ -34,6 +34,7 @@ import {
 import { database, firestore } from "./firebase";
 
 export const gameConfig: GameConfig = club.game;
+const namePrefix = club.locale === "en" ? "Player" : "Oyuncu";
 
 type Res<N extends keyof CallableContract> = Promise<CallableContract[N]["res"]>;
 
@@ -111,7 +112,7 @@ async function transition(
     spec.needsQuiz ? loadLiveQuiz(pin) : undefined,
     readHead(pin),
   ]);
-  const ctx = (now: number): OpContext => ({ uid, now, config: gameConfig, quiz });
+  const ctx = (now: number): OpContext => ({ uid, now, config: gameConfig, quiz, namePrefix });
 
   const pre = spec.precheck ? await readParts(pin, spec.parts, head.state?.qIndex) : {};
   spec.plan({ ...head, ...pre }, ctx(Date.now()));
