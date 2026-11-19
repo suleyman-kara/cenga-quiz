@@ -19,7 +19,7 @@ export function HostGate({ children }: { children: (user: HostUser, signOut: () 
         <p className="muted">{club.tagline[club.locale]}</p>
         {status === "loading" && <p className="muted">{t("common.loading")}</p>}
         {status === "signedOut" && (
-          <button type="button" className="btn btn--primary" onClick={() => void signIn().catch(() => undefined)}>
+          <button type="button" className="btn btn--primary" onClick={() => void Promise.resolve().then(signIn).catch(() => undefined)}>
             {t("host.signIn")}
           </button>
         )}

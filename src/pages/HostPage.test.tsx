@@ -7,9 +7,9 @@ import { club } from "../club.config";
 import { HostPage } from "./HostPage";
 import { useHostAuth, useMyQuizzes, saveQuiz } from "../game/host";
 import { validateQuiz } from "../../shared/quizValidate";
-import { call } from "../firebase";
+import { hostCall } from "../firebase";
 
-vi.mock("../firebase", () => ({ call: vi.fn() }));
+vi.mock("../firebase", () => ({ hostCall: vi.fn() }));
 vi.mock("../game/host", () => ({ useHostAuth: vi.fn(), useMyQuizzes: vi.fn(), saveQuiz: vi.fn() }));
 vi.mock("../../shared/quizValidate", () => ({ validateQuiz: vi.fn() }));
 
@@ -32,7 +32,7 @@ const validQuiz = { title: "Genel kültür", questions: [{ text: "S1", options: 
 
 describe("HostPage", () => {
   beforeEach(() => {
-    signIn.mockReset();
+    signIn.mockReset().mockResolvedValue(undefined);
     vi.mocked(useHostAuth).mockReturnValue({ status: "authorized", user, signIn, signOut: vi.fn() });
     vi.mocked(useMyQuizzes).mockReturnValue({
       quizzes: [{ id: "quiz1", title: "Tarih", questionCount: 7, updatedAt: 0 }],
@@ -41,7 +41,7 @@ describe("HostPage", () => {
     });
     vi.mocked(saveQuiz).mockReset().mockResolvedValue("newId");
     vi.mocked(validateQuiz).mockReset();
-    vi.mocked(call).mockReset();
+    vi.mocked(hostCall).mockReset();
   });
 
   it("signed out: offers Google sign-in", async () => {
@@ -68,10 +68,10 @@ describe("HostPage", () => {
   });
 
   it("Start game calls createGame and opens the big screen", async () => {
-    vi.mocked(call).mockResolvedValue({ pin: "123456" });
+    vi.mocked(hostCall).mockResolvedValue({ pin: "123456" });
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: t("host.createGame") }));
-    expect(call).toHaveBeenCalledWith("createGame", { quizId: "quiz1" });
+    expect(hostCall).toHaveBeenCalledWith("createGame", { quizId: "quiz1" });
     expect(await screen.findByText("BIG SCREEN")).toBeInTheDocument();
   });
 

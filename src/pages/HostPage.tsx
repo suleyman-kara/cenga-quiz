@@ -7,7 +7,7 @@ import { Layout } from "../components/Layout";
 import { ChoiceShape } from "../components/ChoiceShape";
 import { Loading } from "../components/Loading";
 import { club } from "../club.config";
-import { call } from "../firebase";
+import { hostCall } from "../firebase";
 import { t } from "../i18n";
 
 export function HostPage() {
@@ -25,7 +25,7 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
     setStarting(quizId);
     setStartError(null);
     try {
-      const { pin } = await call("createGame", { quizId });
+      const { pin } = await hostCall("createGame", { quizId });
       navigate(`/host/game/${pin}`);
     } catch (err) {
       setStartError(t("common.error", { message: (err as Error).message }));
