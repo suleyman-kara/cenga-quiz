@@ -223,6 +223,18 @@ describe("HostGame", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: t("hostGame.reveal") })).toBeDisabled();
+    // options stay hidden until answering opens
+    expect(screen.getByText("Başkent?")).toBeInTheDocument();
+    expect(screen.queryByText("Ankara")).not.toBeInTheDocument();
+    expect(screen.queryByText("İzmir")).not.toBeInTheDocument();
+  });
+
+  it("options appear on the stage once the timer starts", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), startedAt: 4_000, endsAt: 24_000 });
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    renderHost();
+    expect(screen.getByText("Ankara")).toBeInTheDocument();
+    expect(screen.getByText("İzmir")).toBeInTheDocument();
   });
 
   it("auto-reveals once, 300 ms after endsAt (server clock), with the expected qIndex", async () => {

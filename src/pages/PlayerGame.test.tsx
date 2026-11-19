@@ -247,14 +247,13 @@ describe("PlayerGame", () => {
     delete (navigator as unknown as { vibrate?: unknown }).vibrate;
   });
 
-  it("lead-in: before startedAt shows 'get ready' with a countdown and buttons stay disabled", async () => {
+  it("lead-in: before startedAt shows 'get ready' with a countdown and no options yet", () => {
     vi.mocked(hooks.useGameState).mockReturnValue({ ...state("question"), startedAt: 7_000, endsAt: 27_000 });
     vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
     renderPlay();
     expect(screen.getByText(t("player.getReady"))).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
-    for (const b of screen.getAllByRole("button", { name: /İzmir|Ankara|Bursa/ })) expect(b).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+    expect(screen.queryAllByRole("button", { name: /İzmir|Ankara|Bursa/ })).toHaveLength(0);
     expect(submitAnswer).not.toHaveBeenCalled();
   });
 

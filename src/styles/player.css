@@ -1132,9 +1132,22 @@
   animation: tick 1s ease-in-out infinite;
 }
 
-.player-question[data-leadin] .choice-grid .choice-btn {
-  opacity: 0.55;
-  filter: saturate(0.6);
+/* şıklar cevaplama açılınca gelir */
+.choice-grid--in {
+  animation: choices-in 0.3s ease-out both;
+}
+
+@keyframes choices-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .choice-grid--in {
+    animation: none;
+  }
 }
 
 .computing {

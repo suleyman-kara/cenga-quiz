@@ -578,14 +578,17 @@ function QuestionStage({
         )}
       </div>
       {question.imageUrl && <img className="stage-question__img" src={question.imageUrl} alt="" />}
-      <ul className="stage-options" data-count={question.options.length} data-leadin={leadIn || undefined}>
-        {question.options.map((opt, i) => (
-          <li key={i} className="stage-option" data-choice={i}>
-            <ChoiceShape index={i} />
-            <span>{opt}</span>
-          </li>
-        ))}
-      </ul>
+      {/* options are only shown once answering opens (not during the "get ready" lead-in) */}
+      {!leadIn && (
+        <ul className="stage-options stage-options--in" data-count={question.options.length}>
+          {question.options.map((opt, i) => (
+            <li key={i} className="stage-option" data-choice={i} style={{ "--i": i } as CSSProperties}>
+              <ChoiceShape index={i} />
+              <span>{opt}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="stage-answered">
         <span className="stage-answered__bar" aria-hidden="true">
           <span style={{ transform: `scaleX(${share})` }} />

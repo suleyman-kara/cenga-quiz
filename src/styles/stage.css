@@ -1004,8 +1004,23 @@ li[data-duplicate] {
   }
 }
 
-.stage-options[data-leadin] .stage-option {
-  opacity: 0.45;
+/* şıklar cevaplama açılınca sırayla gelir */
+.stage-options--in .stage-option {
+  animation: option-in 0.4s var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 0.07s);
+}
+
+@keyframes option-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-options--in .stage-option {
+    animation: none;
+  }
 }
 
 .stage__computing {

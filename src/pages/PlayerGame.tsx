@@ -322,18 +322,21 @@ function QuestionView({
           {t("player.sendFailed")}
         </p>
       )}
-      <div className="choice-grid" data-count={question.options.length} data-locked={locked || undefined}>
-        {question.options.map((opt, i) => (
-          <ChoiceButton
-            key={`${attempt}-${i}`}
-            index={i}
-            text={opt}
-            onSelect={choose}
-            disabled={locked}
-            selected={picked === i}
-          />
-        ))}
-      </div>
+      {/* options appear only once answering opens (not during the "get ready" lead-in) */}
+      {!leadIn && (
+        <div className="choice-grid choice-grid--in" data-count={question.options.length} data-locked={locked || undefined}>
+          {question.options.map((opt, i) => (
+            <ChoiceButton
+              key={`${attempt}-${i}`}
+              index={i}
+              text={opt}
+              onSelect={choose}
+              disabled={locked}
+              selected={picked === i}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
