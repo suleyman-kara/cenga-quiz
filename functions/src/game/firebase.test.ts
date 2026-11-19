@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emulatorDatabaseURL } from "./firebase";
+import { appOptions, emulatorDatabaseURL } from "./firebase";
 
 describe("emulatorDatabaseURL", () => {
   it("is undefined outside the database emulator", () => {
@@ -14,5 +14,17 @@ describe("emulatorDatabaseURL", () => {
   });
   it("leaves real projects alone", () => {
     expect(emulatorDatabaseURL({ FIREBASE_DATABASE_EMULATOR_HOST: "h", FIREBASE_CONFIG: '{"projectId":"real"}' })).toBeUndefined();
+  });
+});
+
+describe("appOptions (DATABASE_URL param)", () => {
+  it("leaves the default app config alone when empty", () => {
+    expect(appOptions("")).toBeUndefined();
+    expect(appOptions("   ")).toBeUndefined();
+  });
+  it("passes a regional RTDB URL as databaseURL", () => {
+    expect(appOptions(" https://p-default-rtdb.europe-west1.firebasedatabase.app ")).toEqual({
+      databaseURL: "https://p-default-rtdb.europe-west1.firebasedatabase.app",
+    });
   });
 });
