@@ -85,10 +85,34 @@ describe("RTDB: default deny", () => {
 
 describe("RTDB: public game nodes", () => {
   const nodes = ["meta", "state", "question", "reveal", "leaderboard"];
-  it.each(nodes)("any signed-in user may read %s", async (node) => {
+  it.each(["meta", "state"])("any signed-in user may read %s (join check)", async (node) => {
     await seed({ phase: "question" });
     await assertSucceeds(player(OUTSIDER).ref(`${G}/${node}`).get());
     await assertSucceeds(host().ref(`${G}/${node}`).get());
+  });
+  it.each(["question", "reveal", "leaderboard"])("%s is readable only by the host and joined players", async (node) => {
+    await seed({ phase: "question" });
+    await assertSucceeds(host().ref(`${G}/${node}`).get());
+    await assertSucceeds(player(P1).ref(`${G}/${node}`).get());
+    await assertFails(player(OUTSIDER).ref(`${G}/${node}`).get());
+  });
+  it("a kicked player loses access to question/reveal/leaderboard", async () => {
+    await seed({ phase: "question" });
+    await owner().ref(`${G}/players/${P1}`).remove();
+    await owner().ref(`${G}/banned/${P1}`).set(true);
+    await assertFails(player(P1).ref(`${G}/question`).get());
+    await assertSucceeds(player(P1).ref(`${G}/state`).get());
+  });
+  it("banned/{uid} is readable by that uid and the host only", async () => {
+    await seed();
+    await owner().ref(`${G}/banned/${OUTSIDER}`).set(true);
+    const snap = await assertSucceeds(player(OUTSIDER).ref(`${G}/banned/${OUTSIDER}`).get());
+    expect(snap.val()).toBe(true);
+    await assertSucceeds(player(P1).ref(`${G}/banned/${P1}`).get()); // own (absent) entry
+    await assertFails(player(P1).ref(`${G}/banned/${OUTSIDER}`).get());
+    await assertFails(player(P1).ref(`${G}/banned`).get());
+    await assertSucceeds(host().ref(`${G}/banned`).get());
+    await assertSucceeds(host().ref(`${G}/banned/${OUTSIDER}`).get());
   });
   it.each(nodes)("unauthenticated users may not read %s", async (node) => {
     await seed({ phase: "question" });
