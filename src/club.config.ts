@@ -149,7 +149,7 @@ export const club: ClubConfig = {
     {
       id: "drop",
       label: { tr: "Damla", en: "Drop" },
-      color: "#24923A", // logodaki yeşilin koyu tonu (beyaz metin kontrastı için)
+      color: "#1F7A33", // logodaki yeşilin koyu tonu (beyaz metin/şekil kontrastı için)
       viewBox: "0 0 100 100",
       svgPath: "M50 6 C50 6 16 46 16 64 A34 34 0 0 0 84 64 C84 46 50 6 50 6 Z",
     },
