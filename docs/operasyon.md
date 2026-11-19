@@ -16,7 +16,11 @@ içindir. Kaynaklar her maddenin altında.
   _Kaynak: firebase.google.com/docs/projects/billing/avoid-surprise-bills_
 - [ ] **API anahtarını kısıtla.** Google Cloud Console → APIs & Services →
   Credentials → tarayıcı anahtarı → yalnızca Firebase API'leri ve kendi alan
-  adlarınız. (Web API anahtarı gizli değildir; kısıtlama kötüye kullanımı azaltır.)
+  adlarınız. Yönlendiren (referrer) listesine **mutlaka**
+  `<proje-kimliği>.web.app/*`, `<proje-kimliği>.firebaseapp.com/*` (Google
+  giriş penceresi buradan açılır) ve varsa özel alan adınızı ekleyin; aksi halde
+  sunucu girişi bozulur. (Web API anahtarı gizli değildir; kısıtlama kötüye
+  kullanımı azaltır.)
   _Kaynak: firebase.google.com/docs/projects/api-keys_
 - [ ] **Realtime Database konumu `europe-west1`** olmalı (URL
   `*.europe-west1.firebasedatabase.app`). Functions da aynı bölgede.
@@ -73,6 +77,12 @@ içindir. Kaynaklar her maddenin altında.
   (çıkarılan cihaz aynı oyuna geri giremez).
 - [ ] Oyunculara: "Ekranı kilitlemeyin; kilitlenirse sayfaya geri dönmeniz
   yeterli, kaldığınız yerden devam edersiniz."
+- [ ] **Geç katılım kapalıdır** (bilinçli karar): oyun başladıktan sonra yeni
+  cihaz katılamaz. Aynı tarayıcıdan dönen oyuncu kaldığı yerden devam eder; ama
+  farklı bir tarayıcıya/gizli sekmeye geçen ya da çerezlerini silen oyuncu yeni
+  bir kimlik alır ve o oyuna geri giremez. Oyunculara uygulama içi tarayıcı
+  yerine (Instagram/WhatsApp içinden açılan) normal tarayıcıyı kullanmalarını
+  söyleyin.
 
 ## 5. Kişisel veriler (KVKK) — hukuki tavsiye değildir
 
