@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { GameState, PlayerScore, PublicQuestion } from "../../shared/types";
@@ -8,6 +8,7 @@ import { club } from "../club.config";
 import { PlayerGame } from "./PlayerGame";
 import * as hooks from "../game/hooks";
 import { submitAnswer } from "../game/actions";
+import { saveSession } from "../game/session";
 
 vi.mock("../firebase", () => ({ call: vi.fn() }));
 vi.mock("../game/actions", () => ({ checkGame: vi.fn(), joinGame: vi.fn(), submitAnswer: vi.fn() }));
@@ -22,7 +23,10 @@ vi.mock("../game/hooks", () => ({
   usePlayers: vi.fn(),
   useAnswerCount: vi.fn(),
   useServerNow: vi.fn(),
+  useMyPlayer: vi.fn(),
+  useBanned: vi.fn(),
 }));
+vi.mock("../game/connection", () => ({ useConnectionLost: () => false }));
 
 const t = (k: Parameters<typeof translate>[1], v?: Record<string, string | number>) => translate(club.locale, k, v);
 
@@ -58,8 +62,10 @@ function renderPlay() {
 
 describe("PlayerGame", () => {
   beforeEach(() => {
-    sessionStorage.clear();
-    sessionStorage.setItem("quiz.session", JSON.stringify({ pin: "123456", name: "Ayşe" }));
+    localStorage.clear();
+    saveSession({ pin: "123456", name: "Ayşe" });
+    vi.mocked(hooks.useMyPlayer).mockReturnValue({ name: "Ayşe", joinedAt: 1 });
+    vi.mocked(hooks.useBanned).mockReturnValue(null);
     vi.mocked(hooks.usePlayerUid).mockReturnValue("u1");
     vi.mocked(hooks.useGameState).mockReturnValue(state("lobby", -1));
     vi.mocked(hooks.useMeta).mockReturnValue(undefined);
@@ -72,7 +78,7 @@ describe("PlayerGame", () => {
   });
 
   it("sends players without a session for this PIN back to the join screen", async () => {
-    sessionStorage.clear();
+    localStorage.clear();
     renderPlay();
     expect(await screen.findByText("JOIN SCREEN")).toBeInTheDocument();
   });
@@ -107,7 +113,7 @@ describe("PlayerGame", () => {
 
   it("question: remembers the answer after a refresh", () => {
     vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
-    sessionStorage.setItem("quiz.answered.123456.0", "2");
+    localStorage.setItem("quiz.answered.123456.0", "2");
     renderPlay();
     expect(screen.getByText(t("player.answerLocked"))).toBeInTheDocument();
   });
@@ -162,5 +168,119 @@ describe("PlayerGame", () => {
     vi.mocked(hooks.useGameState).mockReturnValue(null);
     renderPlay();
     expect(screen.getByText(t("player.gameGone"))).toBeInTheDocument();
+  });
+
+  it("question: shows 'sending' until the write is confirmed, then 'locked'; persists only after success", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    let resolve!: () => void;
+    vi.mocked(submitAnswer).mockReturnValue(new Promise<void>((r) => (resolve = r)));
+    renderPlay();
+    await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+    expect(screen.getByText(t("player.sending"))).toBeInTheDocument();
+    expect(screen.queryByText(t("player.answerLocked"))).not.toBeInTheDocument();
+    expect(localStorage.getItem("quiz.answered.123456.0")).toBeNull();
+    await act(async () => resolve());
+    expect(screen.getByText(t("player.answerLocked"))).toBeInTheDocument();
+    expect(localStorage.getItem("quiz.answered.123456.0")).toBe("1");
+  });
+
+  it("question: a failed write before endsAt allows a retry", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    vi.mocked(submitAnswer)
+      .mockRejectedValueOnce(Object.assign(new Error("PERMISSION_DENIED: Permission denied"), { code: "PERMISSION_DENIED" }))
+      .mockResolvedValue(undefined);
+    renderPlay();
+    await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+    expect(await screen.findByText(t("player.sendFailed"))).toBeInTheDocument();
+    expect(localStorage.getItem("quiz.answered.123456.0")).toBeNull();
+    const again = screen.getByRole("button", { name: /Bursa/ });
+    expect(again).toBeEnabled();
+    await userEvent.click(again);
+    expect(submitAnswer).toHaveBeenCalledTimes(2);
+    expect(submitAnswer).toHaveBeenLastCalledWith("123456", 0, 2);
+    expect(await screen.findByText(t("player.answerLocked"))).toBeInTheDocument();
+  });
+
+  it("question: PERMISSION_DENIED after time is up says the answer was not received", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    let reject!: (e: Error) => void;
+    vi.mocked(submitAnswer).mockReturnValue(new Promise<void>((_, r) => (reject = r)));
+    const { rerender } = renderPlay();
+    await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+    vi.mocked(hooks.useServerNow).mockReturnValue(22_000);
+    rerender(
+      <MemoryRouter initialEntries={["/play/123456"]}>
+        <Routes>
+          <Route path="/play/:pin" element={<PlayerGame />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await act(async () => reject(Object.assign(new Error("PERMISSION_DENIED"), { code: "PERMISSION_DENIED" })));
+    expect(screen.getByText(t("player.answerRejected"))).toBeInTheDocument();
+    expect(screen.queryByText(t("player.answerLocked"))).not.toBeInTheDocument();
+    for (const b of screen.getAllByRole("button", { name: /İzmir|Ankara|Bursa/ })) expect(b).toBeDisabled();
+  });
+
+  it("question: vibrates briefly on answer when supported", async () => {
+    const vibrate = vi.fn();
+    Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    renderPlay();
+    await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+    expect(vibrate).toHaveBeenCalledWith(30);
+    delete (navigator as unknown as { vibrate?: unknown }).vibrate;
+  });
+
+  it("lead-in: before startedAt shows 'get ready' with a countdown and buttons stay disabled", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...state("question"), startedAt: 7_000, endsAt: 27_000 });
+    vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
+    renderPlay();
+    expect(screen.getByText(t("player.getReady"))).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    for (const b of screen.getAllByRole("button", { name: /İzmir|Ankara|Bursa/ })) expect(b).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+    expect(submitAnswer).not.toHaveBeenCalled();
+  });
+
+  it("announces the countdown politely only at 10 and 5 seconds", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    vi.mocked(hooks.useServerNow).mockReturnValue(12_000); // 9 s left
+    renderPlay();
+    const live = document.querySelector('[aria-live="polite"][data-countdown-announcer]');
+    expect(live).toHaveTextContent(t("hostGame.secondsLeft", { seconds: 10 }));
+  });
+
+  it("shows a 'calculating' hint while the server holds the transition lock", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...state("question"), lock: { by: "reveal", at: 4_900 } });
+    renderPlay();
+    expect(screen.getByText(t("common.computing"))).toBeInTheDocument();
+  });
+
+  it("shows the name from the player's own server entry (the server may rename it)", () => {
+    vi.mocked(hooks.useMyPlayer).mockReturnValue({ name: "Ayşe (2)", joinedAt: 1 });
+    renderPlay();
+    expect(screen.getByText("Ayşe (2)")).toBeInTheDocument();
+  });
+
+  it("kicked: shows the removed screen", () => {
+    vi.mocked(hooks.useBanned).mockReturnValue(true);
+    vi.mocked(hooks.useMyPlayer).mockReturnValue(null);
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    vi.mocked(hooks.useQuestion).mockReturnValue(null);
+    renderPlay();
+    expect(screen.getByText(t("player.kicked"))).toBeInTheDocument();
+  });
+
+  it("removed at start (no own player entry any more): shows the removed screen", () => {
+    vi.mocked(hooks.useMyPlayer).mockReturnValue(null);
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    renderPlay();
+    expect(screen.getByText(t("player.kicked"))).toBeInTheDocument();
+  });
+
+  it("reveal result is a status region", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    renderPlay();
+    expect(screen.getByText(t("player.correct")).closest('[role="status"]')).not.toBeNull();
   });
 });

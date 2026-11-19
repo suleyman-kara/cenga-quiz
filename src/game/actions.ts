@@ -1,6 +1,6 @@
 import { get, ref, serverTimestamp, set } from "firebase/database";
 import { signInAnonymously } from "firebase/auth";
-import type { AnswerEntry, GameState, PlayerEntry } from "../../shared/types";
+import type { AnswerEntry, GameMeta, GameState, PlayerEntry } from "../../shared/types";
 import { auth, db } from "../firebase";
 import { paths } from "./paths";
 
@@ -14,17 +14,31 @@ export async function ensureUid(): Promise<string> {
   return cred.user.uid;
 }
 
-export type GameCheck = "ok" | "notFound" | "started";
+export type GameCheck =
+  | { kind: "ok" }
+  | { kind: "rejoin"; name: string }
+  | { kind: "notFound" | "started" | "banned" | "locked" };
 
-/** One-off reads of meta + state (no subscription). */
+/**
+ * One-off reads (no subscription): meta, state, and the player's OWN banned/players entries.
+ * players/{uid} is write-once, so somebody who already joined must rejoin, not join again.
+ */
 export async function checkGame(pin: string): Promise<GameCheck> {
-  await ensureUid();
+  const uid = await ensureUid();
   const meta = await get(ref(db, paths.meta(pin)));
-  if (!meta.exists()) return "notFound";
-  const state = await get(ref(db, paths.state(pin)));
+  if (!meta.exists()) return { kind: "notFound" };
+  const [state, banned, me] = await Promise.all([
+    get(ref(db, paths.state(pin))),
+    get(ref(db, paths.banned(pin, uid))),
+    get(ref(db, paths.player(pin, uid))),
+  ]);
   const phase = (state.val() as GameState | null)?.phase;
-  if (phase === "ended") return "notFound";
-  return phase === "lobby" || phase === undefined ? "ok" : "started";
+  if (phase === "ended") return { kind: "notFound" };
+  if (banned.exists()) return { kind: "banned" };
+  if (me.exists()) return { kind: "rejoin", name: (me.val() as PlayerEntry).name };
+  if (phase !== "lobby" && phase !== undefined) return { kind: "started" };
+  if ((meta.val() as GameMeta).locked === true) return { kind: "locked" };
+  return { kind: "ok" };
 }
 
 /** Writes players/{uid}; `name` must already be normalized and valid. */

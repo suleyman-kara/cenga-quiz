@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { club } from "../club.config";
 import { ChoiceButton } from "./ChoiceButton";
@@ -40,5 +40,23 @@ describe("<ChoiceButton>", () => {
     expect(screen.getByRole("button")).toBeDisabled();
     await userEvent.click(screen.getByRole("button"));
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("locks on the first pointerdown (no wait for click), click afterwards does not fire again", () => {
+    const onSelect = vi.fn();
+    render(<ChoiceButton index={2} text="X" onSelect={onSelect} />);
+    const btn = screen.getByRole("button");
+    fireEvent.pointerDown(btn);
+    expect(onSelect).toHaveBeenCalledWith(2);
+    fireEvent.click(btn);
+    fireEvent.pointerDown(btn);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("keyboard activation (click without pointer) still selects", () => {
+    const onSelect = vi.fn();
+    render(<ChoiceButton index={0} text="X" onSelect={onSelect} />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 });

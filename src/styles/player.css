@@ -1092,3 +1092,103 @@
     padding-top: var(--s-5);
   }
 }
+
+/* ---------- answer sending / lead-in / server computing ---------- */
+.locked--sending {
+  color: var(--color-text);
+}
+
+.locked__spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 5px solid color-mix(in srgb, var(--c, var(--color-primary)) 22%, transparent);
+  border-top-color: var(--c, var(--color-primary));
+  animation: spin 0.8s linear infinite;
+}
+
+.getready {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: var(--s-6) var(--s-5);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-raise);
+  animation: step-in-up 0.35s var(--ease-out);
+}
+
+.getready__title {
+  font: 700 clamp(1.5rem, 7vw, 2rem) / 1.1 var(--font-heading);
+  color: var(--color-primary);
+}
+
+.getready__num {
+  font: 800 clamp(3.5rem, 22vw, 6rem) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  animation: tick 1s ease-in-out infinite;
+}
+
+.player-question[data-leadin] .choice-grid .choice-btn {
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+
+.computing {
+  align-self: center;
+  margin-bottom: var(--s-2);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.computing::before {
+  content: "";
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  vertical-align: -0.05em;
+  animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .locked__spinner,
+  .computing::before,
+  .getready__num {
+    animation-duration: 0s;
+  }
+}
+
+/* ---------- join: network hint + privacy notice ---------- */
+.join__network {
+  font-size: 0.95rem;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.privacy {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.privacy__title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.privacy ul {
+  margin: 0;
+  padding-left: 1.1em;
+}

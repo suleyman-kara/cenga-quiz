@@ -3,7 +3,7 @@
  * `null` when the node does not exist.
  *
  * TRAFFIC RULE: player screens use only useGameState, useQuestion, useReveal,
- * useLeaderboard, useMyScore (+ useMeta). usePlayers / useAnswerCount are
+ * useLeaderboard, useMyScore, useMyPlayer, useBanned (+ useMeta) — all single small nodes. usePlayers / useAnswerCount are
  * host-only — they subscribe to lists that grow with the audience.
  */
 import { useEffect, useState } from "react";
@@ -68,6 +68,12 @@ export const useReveal = (pin: string) => useRtdbValue<RevealData>(paths.reveal(
 export const useLeaderboard = (pin: string) => useRtdbValue<Leaderboard>(paths.leaderboard(pin));
 export const useMyScore = (pin: string, uid: string | null) =>
   useRtdbValue<PlayerScore>(uid ? paths.score(pin, uid) : null);
+
+/** The player's OWN players/{uid} entry: the server may rename it at start; null once removed. */
+export const useMyPlayer = (pin: string, uid: string | null) =>
+  useRtdbValue<PlayerEntry>(uid ? paths.player(pin, uid) : null);
+/** true once the host kicked this player (banned/{uid} is readable by that uid). */
+export const useBanned = (pin: string, uid: string | null) => useRtdbValue<true>(uid ? paths.banned(pin, uid) : null);
 
 export interface PlayerListItem extends PlayerEntry {
   uid: string;

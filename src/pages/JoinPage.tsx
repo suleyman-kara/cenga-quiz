@@ -1,9 +1,13 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { isValidPin } from "../../shared/pin";
 import { NAME_MAX, isValidName, normalizeName } from "../../shared/names";
-import { checkGame, joinGame } from "../game/actions";
-import { loadSession, saveSession } from "../game/session";
+import { isNameAllowed } from "../../shared/profanity";
+import { checkGame, joinGame, type GameCheck } from "../game/actions";
+import { useOfflineFor } from "../game/connection";
+import { loadLastSession, saveSession } from "../game/session";
+import { friendlyError, isPermissionDenied } from "../errors";
+import type { MessageKey } from "../i18n";
 import { Layout } from "../components/Layout";
 import { ChoiceShape } from "../components/ChoiceShape";
 import { club } from "../club.config";
@@ -11,17 +15,49 @@ import { t } from "../i18n";
 
 const digitsOnly = (s: string) => s.replace(/\D/g, "").slice(0, 6);
 
+const CHECK_MESSAGE: Record<Exclude<GameCheck["kind"], "ok" | "rejoin">, MessageKey> = {
+  notFound: "join.notFound",
+  started: "join.started",
+  banned: "join.banned",
+  locked: "join.locked",
+};
+
+/** If WebSockets are blocked the realtime connection never comes up; suggest mobile data. */
+const SLOW_NETWORK_MS = 8000;
+
 export function JoinPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const existing = loadSession();
+  const existing = loadLastSession();
   const [step, setStep] = useState<"pin" | "name">("pin");
   const [pin, setPin] = useState(() => digitsOnly(params.get("pin") ?? ""));
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => (params.get("invalid") ? t("app.invalidPin") : null));
+  const slowNetwork = useOfflineFor(SLOW_NETWORK_MS);
 
-  if (existing) return <Navigate to={`/play/${existing.pin}`} replace />;
+  // Arriving with ?pin= (QR code, or sent back from /play after losing the session): check it
+  // right away so a returning player is rejoined without typing anything.
+  const autoChecked = useRef(false);
+  useEffect(() => {
+    if (autoChecked.current || !isValidPin(pin) || !params.get("pin")) return;
+    autoChecked.current = true;
+    void runCheck();
+  }, []);
+
+  if (existing && !params.get("pin")) return <Navigate to={`/play/${existing.pin}`} replace />;
+
+  /** Applies a checkGame result; returns true when the name step may continue. */
+  function applyCheck(res: GameCheck): boolean {
+    if (res.kind === "ok") return true;
+    if (res.kind === "rejoin") {
+      saveSession({ pin, name: res.name });
+      navigate(`/play/${pin}`, { replace: true });
+      return false;
+    }
+    setError(t(CHECK_MESSAGE[res.kind]));
+    return false;
+  }
 
   const pinOk = isValidPin(pin);
   const pinWrong = pin.length === 6 && !pinOk;
@@ -29,14 +65,16 @@ export function JoinPage() {
   async function submitPin(e: FormEvent) {
     e.preventDefault();
     if (!pinOk || busy) return;
+    await runCheck();
+  }
+
+  async function runCheck() {
     setBusy(true);
     setError(null);
     try {
-      const res = await checkGame(pin);
-      if (res === "ok") setStep("name");
-      else setError(t(res === "started" ? "join.started" : "join.notFound"));
+      if (applyCheck(await checkGame(pin))) setStep("name");
     } catch (err) {
-      setError(t("common.error", { message: (err as Error).message }));
+      setError(friendlyError(err));
     } finally {
       setBusy(false);
     }
@@ -50,6 +88,10 @@ export function JoinPage() {
       setError(t("join.nameInvalid"));
       return;
     }
+    if (!isNameAllowed(clean)) {
+      setError(t("join.nameNotAllowed"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -57,7 +99,18 @@ export function JoinPage() {
       saveSession({ pin, name: clean });
       navigate(`/play/${pin}`, { replace: true });
     } catch (err) {
-      setError(t("common.error", { message: (err as Error).message }));
+      // Rules refused the write: the lobby got locked, the game started, we were kicked, or we
+      // are already in (write-once). Ask the room what happened.
+      const message = friendlyError(err);
+      if (isPermissionDenied(err)) {
+        try {
+          const res = await checkGame(pin);
+          if (!applyCheck(res)) return;
+        } catch {
+          /* keep the generic message */
+        }
+      }
+      setError(message);
       setBusy(false);
     }
   }
@@ -86,7 +139,7 @@ export function JoinPage() {
                 className="pin-field__input"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                autoComplete="one-time-code"
+                autoComplete="off"
                 enterKeyHint="go"
                 maxLength={6}
                 value={pin}
@@ -172,7 +225,31 @@ export function JoinPage() {
             </button>
           </form>
         )}
+        {slowNetwork && (
+          <p className="join__network status" role="status">
+            {t("join.slowNetwork")}
+          </p>
+        )}
+        <PrivacyNotice />
       </section>
     </Layout>
+  );
+}
+
+/** KVKK notice: what is stored, where, for how long. Club name only via config. */
+function PrivacyNotice() {
+  const days = club.game.resultsRetentionDays;
+  return (
+    <aside className="privacy" aria-labelledby="privacy-title">
+      <h2 id="privacy-title" className="privacy__title">
+        {t("join.privacyTitle")}
+      </h2>
+      <ul>
+        <li>{t("join.privacyStored", { club: club.name })}</li>
+        <li>{t("join.privacyWhere")}</li>
+        <li>{days > 0 ? t("join.privacyRetention", { days }) : t("join.privacyRetentionGeneric")}</li>
+        <li>{t("join.privacyNickname")}</li>
+      </ul>
+    </aside>
   );
 }
