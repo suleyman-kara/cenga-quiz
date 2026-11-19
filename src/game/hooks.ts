@@ -21,17 +21,30 @@ import type {
 import { auth, db } from "../firebase";
 import { paths } from "./paths";
 
+/** Signed-in uid (any provider), or null; does not sign anybody in. */
+function useAuthUid(): string | null {
+  const [uid, setUid] = useState<string | null>(auth.currentUser?.uid ?? null);
+  useEffect(() => onAuthStateChanged(auth, (u) => setUid(u?.uid ?? null)), []);
+  return uid;
+}
+
+/**
+ * Subscribes once a user is signed in: rules require auth, and a listener
+ * attached before auth is restored (e.g. after a refresh) would be cancelled.
+ */
 function useRtdbValue<T>(path: string | null): T | null | undefined {
-  const [value, setValue] = useState<{ path: string | null; v: T | null | undefined }>({ path, v: undefined });
+  const uid = useAuthUid();
+  const key = path && uid ? `${uid}|${path}` : null;
+  const [value, setValue] = useState<{ key: string | null; v: T | null | undefined }>({ key, v: undefined });
   useEffect(() => {
-    if (!path) return;
+    if (!key || !path) return;
     return onValue(
       ref(db, path),
-      (snap) => setValue({ path, v: snap.exists() ? (snap.val() as T) : null }),
-      () => setValue({ path, v: null }),
+      (snap) => setValue({ key, v: snap.exists() ? (snap.val() as T) : null }),
+      () => setValue({ key, v: null }),
     );
-  }, [path]);
-  return value.path === path ? value.v : undefined;
+  }, [key, path]);
+  return value.key === key ? value.v : undefined;
 }
 
 /** Current uid; signs in anonymously if nobody is signed in. */
