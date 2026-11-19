@@ -2,7 +2,7 @@ import { useCallback, useState, type CSSProperties, type ReactNode } from "react
 import { Link, useParams } from "react-router-dom";
 import type { GameMeta, GameState, HostActionMap, PublicQuestion, RevealData } from "../../shared/types";
 import {
-  useAnswerCount,
+  useAnswerUids,
   useGameState,
   useLeaderboard,
   useMeta,
@@ -14,7 +14,7 @@ import {
 } from "../game/hooks";
 import { useConnectionLost } from "../game/connection";
 import { HostGate } from "../host/HostGate";
-import { revealDue, useAutoReveal } from "../host/useAutoReveal";
+import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../host/useAutoReveal";
 import { useWakeLock } from "../host/useWakeLock";
 import { withRetry } from "../host/retry";
 import { friendlyError } from "../errors";
@@ -47,7 +47,7 @@ function BigScreen({ pin }: { pin: string }) {
   const leaderboard = useLeaderboard(pin);
   const players = usePlayers(pin);
   const qIndex = state?.qIndex ?? -1;
-  const answered = useAnswerCount(pin, qIndex);
+  const answerUids = useAnswerUids(pin, qIndex);
   const now = useServerNow();
   const lost = useConnectionLost();
   const awake = useWakeLock(state?.phase !== "ended");
@@ -82,12 +82,16 @@ function BigScreen({ pin }: { pin: string }) {
 
   const inQuestion = state?.phase === "question";
   const started = !!state && now >= state.startedAt;
-  const allAnswered = players.length > 0 && answered >= players.length;
+  const playerUids = players.map((p) => p.uid);
+  const answered = answeredCount(playerUids, answerUids);
+  const allAnswered = allPlayersAnswered(playerUids, answerUids);
   const doReveal = useCallback(() => hostCall("reveal", { pin, qIndex }), [pin, qIndex]);
   const auto = useAutoReveal({
     qIndex,
     active: inQuestion,
     due: inQuestion && started && !!state && revealDue({ endsAt: state.endsAt, now, allAnswered }),
+    // never in the same tick as a kick/lock/etc.: wait for it to finish, then re-evaluate
+    paused: busy,
     reveal: doReveal,
     onError: showError,
   });

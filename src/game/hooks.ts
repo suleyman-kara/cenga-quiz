@@ -3,7 +3,7 @@
  * `null` when the node does not exist.
  *
  * TRAFFIC RULE: player screens use only useGameState, useQuestion, useReveal,
- * useLeaderboard, useMyScore, useMyPlayer, useBanned (+ useMeta) — all single small nodes. usePlayers / useAnswerCount are
+ * useLeaderboard, useMyScore, useMyPlayer, useBanned (+ useMeta) — all single small nodes. usePlayers / useAnswerUids are
  * host-only — they subscribe to lists that grow with the audience.
  */
 import { useEffect, useState } from "react";
@@ -87,10 +87,13 @@ export function usePlayers(pin: string): PlayerListItem[] {
     .sort((a, b) => a.joinedAt - b.joinedAt);
 }
 
-/** HOST ONLY: how many players answered question `qIndex`. */
-export function useAnswerCount(pin: string, qIndex: number): number {
+/**
+ * HOST ONLY: uids that answered question `qIndex`. Kicked players' answers stay in the node, so
+ * callers intersect with the current player list (see allPlayersAnswered).
+ */
+export function useAnswerUids(pin: string, qIndex: number): string[] {
   const map = useRtdbValue<Record<string, unknown>>(qIndex >= 0 ? paths.answers(pin, qIndex) : null);
-  return map ? Object.keys(map).length : 0;
+  return map ? Object.keys(map) : [];
 }
 
 /** Server-corrected clock (ms), re-rendering every `tickMs`. */

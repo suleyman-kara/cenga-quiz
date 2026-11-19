@@ -21,7 +21,7 @@ vi.mock("../game/hooks", () => ({
   useLeaderboard: vi.fn(),
   useMyScore: vi.fn(),
   usePlayers: vi.fn(),
-  useAnswerCount: vi.fn(),
+  useAnswerUids: vi.fn(),
   useServerNow: vi.fn(),
   useMyPlayer: vi.fn(),
   useBanned: vi.fn(),
@@ -86,7 +86,7 @@ describe("PlayerGame", () => {
   it("only subscribes to the allowed paths (no players/answers lists)", () => {
     renderPlay();
     expect(hooks.usePlayers).not.toHaveBeenCalled();
-    expect(hooks.useAnswerCount).not.toHaveBeenCalled();
+    expect(hooks.useAnswerUids).not.toHaveBeenCalled();
     expect(hooks.useMyScore).toHaveBeenCalledWith("123456", "u1");
   });
 

@@ -30,7 +30,7 @@ vi.mock("../game/hooks", () => ({
   useLeaderboard: vi.fn(),
   useMyScore: vi.fn(),
   usePlayers: vi.fn(),
-  useAnswerCount: vi.fn(),
+  useAnswerUids: vi.fn(),
   useServerNow: vi.fn(),
 }));
 
@@ -68,7 +68,7 @@ describe("HostGame", () => {
     vi.mocked(hooks.useReveal).mockReturnValue(null);
     vi.mocked(hooks.useLeaderboard).mockReturnValue(null);
     vi.mocked(hooks.usePlayers).mockReturnValue(players(2));
-    vi.mocked(hooks.useAnswerCount).mockReturnValue(0);
+    vi.mocked(hooks.useAnswerUids).mockReturnValue([]);
     vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
   });
 
@@ -116,12 +116,12 @@ describe("HostGame", () => {
   it("question: shows text, options and x / y answered; no reveal while time remains", () => {
     vi.mocked(hooks.useGameState).mockReturnValue(qState());
     vi.mocked(hooks.useQuestion).mockReturnValue(question());
-    vi.mocked(hooks.useAnswerCount).mockReturnValue(1);
+    vi.mocked(hooks.useAnswerUids).mockReturnValue(["u0"]);
     renderHost();
     expect(screen.getByText("Başkent?")).toBeInTheDocument();
     expect(screen.getByText("Ankara")).toBeInTheDocument();
     expect(screen.getByText(t("hostGame.answered", { answered: 1, total: 2 }))).toBeInTheDocument();
-    expect(hooks.useAnswerCount).toHaveBeenCalledWith("123456", 0);
+    expect(hooks.useAnswerUids).toHaveBeenCalledWith("123456", 0);
     expect(callsOf("reveal")).toHaveLength(0);
   });
 
@@ -156,13 +156,23 @@ describe("HostGame", () => {
     vi.mocked(hostCall).mockResolvedValue({ ok: true, already: true } as never);
     vi.mocked(hooks.useGameState).mockReturnValue(qState());
     vi.mocked(hooks.useQuestion).mockReturnValue(question());
-    vi.mocked(hooks.useAnswerCount).mockReturnValue(2);
+    vi.mocked(hooks.useAnswerUids).mockReturnValue(["u0", "u1"]);
     renderHost();
     await waitFor(() => expect(callsOf("reveal")).toHaveLength(1));
     expect(screen.getByRole("button", { name: t("hostGame.reveal") })).toBeDisabled();
     await new Promise((r) => setTimeout(r, 20));
     expect(callsOf("reveal")).toHaveLength(1);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("answers of kicked players do not count: no early 'all answered' reveal", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState());
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    vi.mocked(hooks.useAnswerUids).mockReturnValue(["u0", "kicked"]);
+    renderHost();
+    expect(screen.getByText(t("hostGame.answered", { answered: 1, total: 2 }))).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(callsOf("reveal")).toHaveLength(0);
   });
 
   it("manual Reveal calls reveal once and prevents a later auto-reveal", async () => {
