@@ -160,6 +160,45 @@ describe("rankScores", () => {
     expect(r.b.rank).toBe(1);
   });
 
+  it("tells each player who is directly ahead and by how much", () => {
+    const r = rankScores(
+      { a: score({ score: 500 }), b: score({ score: 900 }), c: score({ score: 900 }), d: score({ score: 100 }) },
+      players,
+    );
+    // Bora ve Cem 900 ile ortak lider; ikinciden (Ayşe 500) 400 öndeler
+    expect(r.b).toMatchObject({ rank: 1, leadGap: 400 });
+    expect(r.c).toMatchObject({ rank: 1, leadGap: 400 });
+    expect(r.b.aheadName).toBeUndefined();
+    // Ayşe'nin önünde ortak liderlerden ilk görüntülenen (Bora) var
+    expect(r.a).toMatchObject({ rank: 3, aheadName: "Bora", aheadGap: 400 });
+    expect(r.a.leadGap).toBeUndefined();
+    expect(r.d).toMatchObject({ rank: 4, aheadName: "Ayşe", aheadGap: 400 });
+  });
+
+  it("no gap info when alone or when everyone is tied", () => {
+    const alone = rankScores({ a: score({ score: 300 }) }, players);
+    expect(alone.a.leadGap).toBeUndefined();
+    expect(alone.a.aheadName).toBeUndefined();
+    const tied = rankScores({ a: score({}), b: score({}) }, players);
+    expect(tied.a.leadGap).toBeUndefined();
+    expect(tied.b.aheadName).toBeUndefined();
+  });
+
+  it("drops stale gap fields from the previous ranking", () => {
+    const r = rankScores(
+      {
+        a: score({ score: 900, aheadName: "Bora", aheadGap: 50 }),
+        b: score({ score: 100, leadGap: 300 }),
+      },
+      players,
+    );
+    expect(r.a).toMatchObject({ rank: 1, leadGap: 800 });
+    expect("aheadName" in r.a).toBe(false);
+    expect("aheadGap" in r.a).toBe(false);
+    expect(r.b).toMatchObject({ rank: 2, aheadName: "Ayşe", aheadGap: 800 });
+    expect("leadGap" in r.b).toBe(false);
+  });
+
   it("does not mutate the input", () => {
     const s = { a: score({ score: 1, rank: 7 }) };
     rankScores(s, players);

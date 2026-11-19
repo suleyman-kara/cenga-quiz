@@ -54,15 +54,30 @@ export function rankScores(
   players: Record<string, PlayerEntry>,
 ): Record<string, PlayerScore> {
   const out: Record<string, PlayerScore> = {};
+  const order = orderUids(scores, players);
   let prevScore: number | undefined;
   let rank = 0;
-  orderUids(scores, players).forEach((uid, i) => {
-    const s = scores[uid];
+  // display index of the first player in the current score group / previous group
+  let groupStart = 0;
+  let prevGroupStart = -1;
+  order.forEach((uid, i) => {
+    const { aheadName, aheadGap, leadGap, ...s } = scores[uid];
     if (s.score !== prevScore) {
       rank = i + 1;
       prevScore = s.score;
+      prevGroupStart = i === 0 ? -1 : groupStart;
+      groupStart = i;
     }
-    out[uid] = { ...s, rank };
+    const row: PlayerScore = { ...s, rank };
+    if (prevGroupStart >= 0) {
+      const ahead = order[prevGroupStart];
+      row.aheadName = players[ahead]?.name ?? "";
+      row.aheadGap = scores[ahead].score - s.score;
+    } else {
+      const below = order.find((u) => scores[u].score < s.score);
+      if (below !== undefined) row.leadGap = s.score - scores[below].score;
+    }
+    out[uid] = row;
   });
   return out;
 }

@@ -35,6 +35,8 @@ export const en = {
   "player.correctWas": "Correct answer: {answer}",
   "player.rank": "You're #{rank}",
   "player.score": "{score} points",
+  "player.behind": "{gap} points behind {name}",
+  "player.leading": "You lead by {gap} points",
   "player.ofPlayers": "out of {count} players",
   "player.finalRank": "Final place: #{rank}",
   "player.gameGone": "This game is over or no longer exists.",

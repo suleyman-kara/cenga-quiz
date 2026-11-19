@@ -172,6 +172,12 @@ export interface PlayerScore {
   /** whether the player answered the last revealed question */
   lastAnswered: boolean;
   correctCount: number;
+  /** name of the nearest player with a strictly higher score (absent for leaders) */
+  aheadName?: string;
+  /** points behind aheadName */
+  aheadGap?: number;
+  /** leaders only: points ahead of the next lower score (absent when nobody is below) */
+  leadGap?: number;
 }
 
 export interface LeaderboardEntry {

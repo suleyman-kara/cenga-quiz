@@ -37,6 +37,8 @@ export const tr: Messages = {
   "player.correctWas": "Doğru cevap: {answer}",
   "player.rank": "{rank}. sıradasın",
   "player.score": "{score} puan",
+  "player.behind": "Önünde {name} var: {gap} puan geridesin",
+  "player.leading": "Liderdesin! {gap} puan öndesin",
   "player.ofPlayers": "{count} oyuncu arasında",
   "player.finalRank": "Final sıran: {rank}.",
   "player.gameGone": "Bu oyun bitti ya da artık yok.",

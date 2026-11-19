@@ -22,6 +22,7 @@ import { ChoiceShape } from "../components/ChoiceShape";
 import { Countdown, remaining, remainingSeconds } from "../components/Countdown";
 import { Loading } from "../components/Loading";
 import { StreakBadge } from "../components/StreakBadge";
+import { GapLine } from "../components/GapLine";
 import { club } from "../club.config";
 import { t } from "../i18n";
 
@@ -404,6 +405,7 @@ function RevealView({
         <p>{t("player.rank", { rank: score.rank })}</p>
         <p>{t("player.score", { score: score.score })}</p>
       </div>
+      <GapLine score={score} />
     </div>
   );
 }
@@ -424,6 +426,7 @@ function RankView({
       <h1 className="headline">{t("player.rank", { rank: score.rank })}</h1>
       {leaderboard && <p className="muted">{t("player.ofPlayers", { count: leaderboard.playerCount })}</p>}
       <p className="rank__score">{t("player.score", { score: score.score })}</p>
+      <GapLine score={score} />
       {score.streak >= 2 && <StreakBadge streak={score.streak} />}
     </div>
   );
