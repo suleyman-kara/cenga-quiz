@@ -20,6 +20,13 @@ import type {
 } from "../../shared/types";
 import { auth, db } from "../firebase";
 import { paths } from "./paths";
+import { subscribeWithRetry } from "./resilient";
+
+/** Before re-subscribing a cancelled listener: wait for auth, then refresh the (maybe expired) token. */
+async function reauth(): Promise<void> {
+  await auth.authStateReady();
+  await auth.currentUser?.getIdToken(true);
+}
 
 /** Signed-in uid (any provider), or null; does not sign anybody in. */
 function useAuthUid(): string | null {
@@ -31,6 +38,8 @@ function useAuthUid(): string | null {
 /**
  * Subscribes once a user is signed in: rules require auth, and a listener
  * attached before auth is restored (e.g. after a refresh) would be cancelled.
+ * A cancelled listener (permission-denied after a long sleep / token refresh) keeps its last
+ * value and is re-subscribed with backoff; only if it stays cancelled does it read as `null`.
  */
 function useRtdbValue<T>(path: string | null): T | null | undefined {
   const uid = useAuthUid();
@@ -38,11 +47,13 @@ function useRtdbValue<T>(path: string | null): T | null | undefined {
   const [value, setValue] = useState<{ key: string | null; v: T | null | undefined }>({ key, v: undefined });
   useEffect(() => {
     if (!key || !path) return;
-    return onValue(
-      ref(db, path),
-      (snap) => setValue({ key, v: snap.exists() ? (snap.val() as T) : null }),
-      () => setValue({ key, v: null }),
-    );
+    return subscribeWithRetry<T | null>({
+      subscribe: (onData, onCancel) =>
+        onValue(ref(db, path), (snap) => onData(snap.exists() ? (snap.val() as T) : null), onCancel),
+      onData: (v) => setValue({ key, v }),
+      onTerminal: () => setValue({ key, v: null }),
+      beforeRetry: reauth,
+    });
   }, [key, path]);
   return value.key === key ? value.v : undefined;
 }
