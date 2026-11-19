@@ -24,9 +24,9 @@ içindir. Kaynaklar her maddenin altında.
   _Kaynak: firebase.google.com/docs/projects/api-keys_
 - [ ] **Realtime Database konumu `europe-west1`** olmalı (URL
   `*.europe-west1.firebasedatabase.app`). Functions da aynı bölgede.
-- [ ] **Sonuç saklama süresi (KVKK):** Firestore → TTL politikaları →
-  `gameResults` koleksiyonu, alan `expireAt`. Süre `src/club.config.ts`
-  içindeki `game.resultsRetentionDays` ile belirlenir.
+- [ ] **Sonuç saklama süresi (KVKK):** TTL politikası (`gameResults.expireAt`)
+  deploy ile otomatik kurulur; Firestore → TTL sekmesinde göründüğünü kontrol
+  edin. Süre `src/club.config.ts` içindeki `game.resultsRetentionDays`.
 - [ ] **Anonim hesap temizliği:** Identity Platform'a yükseltilmiş projelerde 30
   günden eski anonim hesaplar otomatik silinir; yükseltme yapılmadıysa hesaplar
   birikir (zararsız ama kota/temizlik açısından not edin).

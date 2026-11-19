@@ -47,8 +47,10 @@ export function parseFirebaseConfig(input: string): ParseResult {
   const warnings: string[] = [];
   if (!config.databaseURL.endsWith(".europe-west1.firebasedatabase.app")) {
     warnings.push(
-      "databaseURL europe-west1 bölgesinde değil. Functions europe-west1'de çalışır; " +
-        "gecikmeyi düşük tutmak için Realtime Database'i europe-west1 (Belçika) konumunda oluşturun.",
+      "DİKKAT: databaseURL europe-west1 bölgesinde değil. Oyuncu katılım tetikleyicileri " +
+        "(isim temizleme, lobi dolu) veritabanıyla aynı bölgede çalışmak zorundadır ve europe-west1'e " +
+        "deploy edilir; bu haliyle HİÇ tetiklenmezler. Realtime Database'i europe-west1 (Belçika) " +
+        "konumunda yeniden oluşturun.",
     );
   }
   if (!config.authDomain.startsWith(config.projectId)) {

@@ -26,8 +26,11 @@ yayına almak içindir. Toplam süre: ~30 dakika (ilk Functions deploy'u 5-10 dk
 | **Realtime Database** | Oluştur → konum: **Belçika (`europe-west1`)** → *Locked mode*. Kurallar deploy ile gelir. |
 | **Hosting** | Ayrıca bir şey yapmaya gerek yok; ilk deploy açar. |
 
-> Realtime Database'in `europe-west1`'de olması önemli: Functions da orada çalışır,
-> böylece cevap gösterme ve puanlama gecikmesi düşük kalır.
+> Realtime Database **mutlaka** `europe-west1`'de olmalı: oyuncu katılım
+> tetikleyicileri (isim temizleme, lobi dolu sayacı) veritabanıyla aynı bölgede
+> çalışmak zorundadır ve Functions `europe-west1`'e deploy edilir. Başka bölgede
+> oluşturulan veritabanında tetikleyiciler hiç çalışmaz. Varsayılan örneğin adı
+> `<proje-kimliği>-default-rtdb` olmalı (yeni projelerde zaten böyledir).
 
 ## 3. Web uygulamasını ekle ve yapılandırmayı aktar
 
@@ -55,8 +58,14 @@ npm run deploy              # web build + kurallar + Functions + Hosting
 ```
 
 - İlk Functions deploy'unda CLI gerekli Google Cloud API'lerini (Cloud Build,
-  Artifact Registry, Cloud Run, Cloud Scheduler, Eventarc) açar; birkaç dakika
-  sürebilir. "Artifact cleanup policy" sorulursa varsayılanı kabul et.
+  Artifact Registry, Cloud Run, Cloud Scheduler, Eventarc, Pub/Sub) açar; birkaç
+  dakika sürebilir. "Artifact cleanup policy" sorulursa varsayılanı kabul et.
+- İlk deploy **"Eventarc service agent permissions propagating"** hatasıyla
+  durabilir: birkaç dakika bekleyip `npm run deploy:functions` ile tekrarla.
+- Functions deploy'u önce tip kontrolü yapar; bu yüzden `npm --prefix functions install`
+  çalıştırılmış olmalı.
+- Firestore TTL politikası (`gameResults.expireAt`, KVKK saklama süresi) deploy ile
+  **otomatik** kurulur; ayrıca bir şey yapmaya gerek yok.
 - Sadece bir parçayı güncellemek için: `npm run deploy:rules`,
   `npm run deploy:functions`, `npm run deploy:hosting`.
 - Deploy bitince CLI, Hosting adresini yazar:
@@ -84,9 +93,11 @@ yaptıktan sonra `npm run add-host -- ad.soyad@gmail.com`.
 
 ## 7. İsteğe bağlı (önerilen) ayarlar
 
-- **Sonuç saklama süresi (KVKK):** Firestore → *TTL* → koleksiyon
-  `gameResults`, alan `expireAt` → oluştur. Süre `src/club.config.ts` →
-  `game.resultsRetentionDays`.
+- **Sonuç saklama süresi:** `src/club.config.ts` → `game.resultsRetentionDays`
+  (varsayılan 365 gün). TTL politikası deploy ile kurulur; Firestore → *TTL*
+  sekmesinden görebilirsin.
+- **Sunucu listesi değişiklikleri** (`allowedHosts`) Functions önbelleği yüzünden
+  en geç 60 saniyede etkinleşir.
 - **App Check (bot koruması):** App Check → Web uygulaması → reCAPTCHA
   Enterprise → site anahtarını al →
   `npm run configure -- firebase-config.txt --recaptcha <site-anahtarı>` →
