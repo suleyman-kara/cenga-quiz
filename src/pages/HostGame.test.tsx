@@ -113,7 +113,7 @@ describe("HostGame", () => {
   });
 
   it("lobby: shows count / max and a 'full' notice when the server marks the lobby full", () => {
-    vi.mocked(hooks.useMeta).mockReturnValue({ ...meta(), full: true, playerCount: 2 } as never);
+    vi.mocked(hooks.useMeta).mockReturnValue({ ...meta(), full: true, playerCount: 2 });
     renderHost();
     expect(screen.getByText(t("hostGame.playersOfMax", { count: 2, max: club.game.maxPlayers }))).toBeInTheDocument();
     expect(screen.getByText(t("hostGame.lobbyFull"))).toBeInTheDocument();
