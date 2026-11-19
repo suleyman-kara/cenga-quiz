@@ -68,7 +68,7 @@ describe("client SDK end-to-end", () => {
       await new Promise((r) => setTimeout(r, 150));
     }
 
-    await host.call("reveal", { pin });
+    await host.call("reveal", { pin, qIndex: 0 });
     const scores = await readRoom<Record<string, PlayerScore>>(pin, "scores");
     const [a, b, c] = players.map((p) => scores[p.uid]);
     expect(a.lastCorrect && b.lastCorrect).toBe(true);

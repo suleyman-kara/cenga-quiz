@@ -70,11 +70,11 @@ describe("game flow (host callables)", () => {
     await newGame();
     await host.call("startGame", { pin });
     await adminAnswer(pin, 0, "pa", 1, 500);
-    expect(await expectCode(host.call("reveal", { pin }))).toBe("functions/failed-precondition");
+    expect(await expectCode(host.call("reveal", { pin, qIndex: 0 }))).toBe("functions/failed-precondition");
     await adminAnswer(pin, 0, "pb", 1, 2500);
-    expect(await expectCode(host.call("reveal", { pin }))).toBe("functions/failed-precondition");
+    expect(await expectCode(host.call("reveal", { pin, qIndex: 0 }))).toBe("functions/failed-precondition");
     await adminAnswer(pin, 0, "pc", 3, 100);
-    await host.call("reveal", { pin });
+    await host.call("reveal", { pin, qIndex: 0 });
 
     expect((await state()).phase).toBe("reveal");
     expect(await readRoom<RevealData>(pin, "reveal")).toEqual({ qIndex: 0, correct: 1, counts: [0, 2, 0, 1] });
@@ -95,7 +95,7 @@ describe("game flow (host callables)", () => {
     const now = Date.now();
     await adminDb().ref(`games/${pin}/state`).update({ startedAt: now - 6000, endsAt: now - 1000 });
     await adminAnswer(pin, 0, "pa", 1, 1000);
-    await host.call("reveal", { pin });
+    await host.call("reveal", { pin, qIndex: 0 });
     const sc = await scores();
     expect(sc.pa.lastCorrect).toBe(true);
     expect(sc.pb).toMatchObject({ score: 0, lastAnswered: false });
@@ -106,14 +106,37 @@ describe("game flow (host callables)", () => {
     await host.call("startGame", { pin });
     await adminAnswer(pin, 0, "pa", 1, 0);
     const results = await Promise.allSettled([
-      host.call("reveal", { pin }),
-      host.call("reveal", { pin }),
-      host.call("reveal", { pin }),
+      host.call("reveal", { pin, qIndex: 0 }),
+      host.call("reveal", { pin, qIndex: 0 }),
+      host.call("reveal", { pin, qIndex: 0 }),
     ]);
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    // exactly one call did the work; the others were refused as busy or answered "already"
+    const did = results.filter((r) => r.status === "fulfilled" && !(r.value as { already?: true }).already);
+    expect(did).toHaveLength(1);
     const sc = await scores();
     expect(sc.pa.score).toBe(1000);
     expect(sc.pa.correctCount).toBe(1);
+    // once settled, a duplicate reveal is an idempotent success
+    expect(await host.call("reveal", { pin, qIndex: 0 })).toEqual({ ok: true, already: true });
+  });
+
+  it("stale or mismatched step calls", async () => {
+    await newGame({ pa: "Ali" });
+    await host.call("startGame", { pin });
+    expect(await expectCode(host.call("reveal", { pin, qIndex: 1 }))).toBe("functions/failed-precondition");
+    expect(await expectCode(host.call("reveal", { pin } as never))).toBe("functions/invalid-argument");
+    expect(await expectCode(host.call("reveal", { pin, qIndex: -1 }))).toBe("functions/invalid-argument");
+    await adminAnswer(pin, 0, "pa", 1, 0);
+    expect(await host.call("reveal", { pin, qIndex: 0 })).toEqual({ ok: true });
+    expect(await host.call("nextQuestion", { pin, qIndex: 0 })).toEqual({ ok: true });
+    // a second "next" for the same step (double click / retry) does not skip a question
+    expect(await host.call("nextQuestion", { pin, qIndex: 0 })).toEqual({ ok: true, already: true });
+    expect((await state()).qIndex).toBe(1);
+    // reveal/showLeaderboard for a question we already left
+    expect(await host.call("reveal", { pin, qIndex: 0 })).toEqual({ ok: true, already: true });
+    expect(await host.call("showLeaderboard", { pin, qIndex: 0 })).toEqual({ ok: true, already: true });
+    // showLeaderboard for the current, unrevealed question is still an error
+    expect(await expectCode(host.call("showLeaderboard", { pin, qIndex: 1 }))).toBe("functions/failed-precondition");
   });
 
   it("streak bonus, leaderboard phase, nextQuestion past last refused, endGame archives", async () => {
@@ -123,12 +146,13 @@ describe("game flow (host callables)", () => {
     await adminAnswer(pin, 0, "pa", 1, 0);
     await adminAnswer(pin, 0, "pb", 1, 0);
     await adminAnswer(pin, 0, "pc", 0, 0);
-    await host.call("reveal", { pin });
-    await host.call("showLeaderboard", { pin });
+    await host.call("reveal", { pin, qIndex: 0 });
+    await host.call("showLeaderboard", { pin, qIndex: 0 });
     expect((await state()).phase).toBe("leaderboard");
-    expect(await expectCode(host.call("showLeaderboard", { pin }))).toBe("functions/failed-precondition");
+    // a stale/duplicate click is an idempotent success, not an error
+    expect(await host.call("showLeaderboard", { pin, qIndex: 0 })).toEqual({ ok: true, already: true });
 
-    await host.call("nextQuestion", { pin });
+    await host.call("nextQuestion", { pin, qIndex: 0 });
     let s = await state();
     expect(s).toMatchObject({ phase: "question", qIndex: 1 });
     expect(await readRoom(pin, "reveal")).toBeNull();
@@ -140,7 +164,7 @@ describe("game flow (host callables)", () => {
     await adminAnswer(pin, 1, "pa", 0, 1000);
     await adminAnswer(pin, 1, "pb", 1, 1000);
     await adminAnswer(pin, 1, "pc", 0, 1000);
-    await host.call("reveal", { pin });
+    await host.call("reveal", { pin, qIndex: 1 });
     let sc = await scores();
     expect(sc.pa.streak).toBe(2);
     expect(sc.pc.streak).toBe(1);
@@ -148,12 +172,12 @@ describe("game flow (host callables)", () => {
     expect(sc.pb).toMatchObject({ streak: 0, lastDelta: 0 });
 
     // straight from reveal to Q2
-    await host.call("nextQuestion", { pin });
+    await host.call("nextQuestion", { pin, qIndex: 1 });
     await adminAnswer(pin, 2, "pa", 2, 0);
     await adminAnswer(pin, 2, "pb", 2, 500);
     await adminAnswer(pin, 2, "pc", 2, 0);
-    await host.call("reveal", { pin });
-    expect(await expectCode(host.call("nextQuestion", { pin }))).toBe("functions/failed-precondition");
+    await host.call("reveal", { pin, qIndex: 2 });
+    expect(await expectCode(host.call("nextQuestion", { pin, qIndex: 2 }))).toBe("functions/failed-precondition");
     sc = await scores();
 
     const { ok, resultId } = await host.call("endGame", { pin });
@@ -176,8 +200,11 @@ describe("game flow (host callables)", () => {
     expect(result.results[0]).toEqual({ uid: "pa", name: "Ali", score: sc.pa.score, rank: 1, correctCount: 3 });
     expect(result.results.map((r) => r.rank)).toEqual([1, 2, 3]);
 
-    expect(await expectCode(host.call("endGame", { pin }))).toBe("functions/failed-precondition");
-    expect(await expectCode(host.call("nextQuestion", { pin }))).toBe("functions/failed-precondition");
+    // endGame twice → same result, no duplicate archive
+    expect(await host.call("endGame", { pin })).toEqual({ ok: true, already: true, resultId });
+    expect((await adminFs().collection("gameResults").get()).size).toBe(1);
+    // stale "next" after the end
+    expect(await host.call("nextQuestion", { pin, qIndex: 2 })).toEqual({ ok: true, already: true });
   });
 
   it("endGame works straight from the lobby", async () => {
