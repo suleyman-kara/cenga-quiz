@@ -1,1 +1,50 @@
-{"rules":{".read":false,".write":false}}
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "games": {
+      "$pin": {
+        "meta": { ".read": "auth != null" },
+        "state": { ".read": "auth != null" },
+        "question": { ".read": "auth != null" },
+        "reveal": { ".read": "auth != null" },
+        "leaderboard": { ".read": "auth != null" },
+        "players": {
+          ".read": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
+          ".indexOn": ["joinedAt"],
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && root.child('games/' + $pin + '/meta').exists() && root.child('games/' + $pin + '/state/phase').val() === 'lobby'",
+            ".validate": "newData.hasChildren(['name', 'joinedAt'])",
+            "name": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9çğıöşüÇĞİÖŞÜ _.-]{1,20}$/)"
+            },
+            "joinedAt": {
+              ".validate": "newData.isNumber() && (newData.val() === now || (data.exists() && newData.val() === data.val()))"
+            },
+            "$other": { ".validate": false }
+          }
+        },
+        "answers": {
+          ".read": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
+          "$qIndex": {
+            "$uid": {
+              ".read": "auth != null && auth.uid === $uid",
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('games/' + $pin + '/players/' + $uid).exists() && root.child('games/' + $pin + '/state/phase').val() === 'question' && root.child('games/' + $pin + '/state/qIndex').isNumber() && root.child('games/' + $pin + '/state/qIndex').val() + '' === $qIndex && now < root.child('games/' + $pin + '/state/endsAt').val()",
+              ".validate": "newData.hasChildren(['choice', 'at'])",
+              "choice": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() % 1 === 0 && root.child('games/' + $pin + '/question/options/' + newData.val()).exists()"
+              },
+              "at": { ".validate": "newData.isNumber() && newData.val() === now" },
+              "$other": { ".validate": false }
+            }
+          }
+        },
+        "scores": {
+          ".read": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
+          "$uid": { ".read": "auth != null && auth.uid === $uid" }
+        }
+      }
+    }
+  }
+}
