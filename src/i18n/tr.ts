@@ -16,7 +16,7 @@ export const tr: Messages = {
   "join.started": "Bu oyun başladı; yeni oyuncu katılamaz.",
   "join.nameLabel": "Takma adın",
   "join.nameHint": "En fazla {max} karakter: harf, rakam, boşluk, . _ -",
-  "join.nameInvalid": "1–{max} karakter kullan: harf, rakam, boşluk ya da . _ -",
+  "join.nameInvalid": "Bu takma ad olmaz. Harf, rakam, boşluk ya da . _ - kullan.",
   "join.join": "Katıl",
   "join.joining": "Katılınıyor…",
   "join.changePin": "PIN'i değiştir",

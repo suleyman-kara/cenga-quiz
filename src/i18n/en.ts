@@ -14,7 +14,7 @@ export const en = {
   "join.started": "This game has already started, so new players can't join.",
   "join.nameLabel": "Your nickname",
   "join.nameHint": "Up to {max} characters: letters, digits, spaces, . _ -",
-  "join.nameInvalid": "Use 1–{max} letters, digits, spaces or . _ -",
+  "join.nameInvalid": "That nickname won't work. Use letters, digits, spaces or . _ -",
   "join.join": "Join",
   "join.joining": "Joining…",
   "join.changePin": "Change PIN",
