@@ -140,6 +140,20 @@ describe("Firestore: quizzes", () => {
     });
     await assertFails(getDoc(doc(anonDb("anon-1"), "quizzes", "qa")));
   });
+  it("host e-mail is matched case-insensitively (token e-mail lowercased)", async () => {
+    const mixed = firestoreAs({ uid: HOST_UID, token: { ...hostToken, email: "Host@Example.COM" } as TokenOptions });
+    await assertSucceeds(setDoc(doc(mixed, "quizzes", "mixed"), quiz(HOST_UID)));
+    await assertSucceeds(getDoc(doc(mixed, "allowedHosts", HOST_EMAIL)));
+  });
+  it("a removed host can still read and delete own quizzes but not create or update", async () => {
+    await seedFs(async (db) => {
+      await deleteDoc(doc(db, "allowedHosts", HOST_EMAIL));
+    });
+    await assertSucceeds(getDoc(doc(hostDb(), "quizzes", "q1")));
+    await assertFails(updateDoc(doc(hostDb(), "quizzes", "q1"), { title: "Yeni", updatedAt: 2 }));
+    await assertFails(setDoc(doc(hostDb(), "quizzes", "new"), quiz(HOST_UID)));
+    await assertSucceeds(deleteDoc(doc(hostDb(), "quizzes", "q1")));
+  });
   it("ownerUid is immutable on update", async () => {
     await assertFails(updateDoc(doc(hostDb(), "quizzes", "q1"), { ownerUid: OTHER_HOST_UID }));
   });
