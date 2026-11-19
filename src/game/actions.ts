@@ -17,7 +17,10 @@ export async function ensureUid(): Promise<string> {
 export type GameCheck =
   | { kind: "ok" }
   | { kind: "rejoin"; name: string }
-  | { kind: "notFound" | "started" | "banned" | "locked" };
+  | { kind: "notFound" | "started" | "banned" | "locked" | "full" };
+
+/** Server-maintained capacity fields (joins are denied while `full`). */
+export type MetaWithCapacity = GameMeta & { full?: boolean; playerCount?: number };
 
 /**
  * One-off reads (no subscription): meta, state, and the player's OWN banned/players entries.
@@ -37,7 +40,8 @@ export async function checkGame(pin: string): Promise<GameCheck> {
   if (banned.exists()) return { kind: "banned" };
   if (me.exists()) return { kind: "rejoin", name: (me.val() as PlayerEntry).name };
   if (phase !== "lobby" && phase !== undefined) return { kind: "started" };
-  if ((meta.val() as GameMeta).locked === true) return { kind: "locked" };
+  if ((meta.val() as MetaWithCapacity).locked === true) return { kind: "locked" };
+  if ((meta.val() as MetaWithCapacity).full === true) return { kind: "full" };
   return { kind: "ok" };
 }
 

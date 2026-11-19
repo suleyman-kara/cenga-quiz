@@ -199,6 +199,16 @@
   margin-bottom: 20px;
 }
 
+.stage-lobby__full {
+  margin-left: 14px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-size: 0.55em;
+  vertical-align: middle;
+  background: var(--color-danger);
+  color: var(--color-on-primary);
+}
+
 .stage-lobby__empty {
   flex: 1;
   display: flex;

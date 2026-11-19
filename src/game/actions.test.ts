@@ -42,6 +42,16 @@ describe("checkGame", () => {
     expect(await checkGame("123456")).toEqual({ kind: "locked" });
   });
 
+  it("full lobby (meta.full)", async () => {
+    room({ [`${P}/meta`]: { full: true, playerCount: 300 }, [`${P}/state`]: { phase: "lobby" } });
+    expect(await checkGame("123456")).toEqual({ kind: "full" });
+  });
+
+  it("a player already in a full lobby still rejoins", async () => {
+    room({ [`${P}/meta`]: { full: true }, [`${P}/state`]: { phase: "lobby" }, [`${P}/players/u1`]: { name: "Ali", joinedAt: 1 } });
+    expect(await checkGame("123456")).toEqual({ kind: "rejoin", name: "Ali" });
+  });
+
   it("banned player", async () => {
     room({ [`${P}/meta`]: {}, [`${P}/state`]: { phase: "lobby" }, [`${P}/banned/u1`]: true });
     expect(await checkGame("123456")).toEqual({ kind: "banned" });

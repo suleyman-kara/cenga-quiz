@@ -20,6 +20,7 @@ const CHECK_MESSAGE: Record<Exclude<GameCheck["kind"], "ok" | "rejoin">, Message
   started: "join.started",
   banned: "join.banned",
   locked: "join.locked",
+  full: "join.full",
 };
 
 /** If WebSockets are blocked the realtime connection never comes up; suggest mobile data. */

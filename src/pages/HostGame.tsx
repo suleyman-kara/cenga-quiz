@@ -13,6 +13,7 @@ import {
 } from "../game/hooks";
 import { useConnectionLost } from "../game/connection";
 import { HostGate } from "../host/HostGate";
+import type { MetaWithCapacity } from "../game/actions";
 import { displayPlayers, type DisplayPlayer } from "../host/displayNames";
 import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../host/useAutoReveal";
 import { useWakeLock } from "../host/useWakeLock";
@@ -305,6 +306,7 @@ function LobbyStage({
   onKick: (p: DisplayPlayer) => void;
   busy: boolean;
 }) {
+  const full = (meta as MetaWithCapacity | null | undefined)?.full === true;
   return (
     <div className="stage-lobby">
       <div className="stage-lobby__join">
@@ -326,7 +328,8 @@ function LobbyStage({
       </div>
       <div className="stage-lobby__players">
         <p className="stage-lobby__count" aria-live="polite">
-          {t("hostGame.players", { count: players.length })}
+          {t("hostGame.playersOfMax", { count: players.length, max: club.game.maxPlayers })}
+          {full && <span className="stage-lobby__full">{t("hostGame.lobbyFull")}</span>}
         </p>
         {players.length === 0 ? (
           <div className="stage-lobby__empty">

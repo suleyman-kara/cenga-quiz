@@ -149,6 +149,21 @@ describe("JoinPage", () => {
     expect(await screen.findByText(t("join.locked"))).toBeInTheDocument();
   });
 
+  it("full lobby is explained ('Lobi dolu')", async () => {
+    vi.mocked(checkGame).mockResolvedValue({ kind: "full" });
+    await enterPin();
+    expect(await screen.findByText(t("join.full"))).toBeInTheDocument();
+  });
+
+  it("a join refused because the lobby filled up meanwhile says so", async () => {
+    vi.mocked(joinGame).mockRejectedValue(Object.assign(new Error("PERMISSION_DENIED"), { code: "PERMISSION_DENIED" }));
+    await enterPin();
+    vi.mocked(checkGame).mockResolvedValue({ kind: "full" });
+    await userEvent.type(await screen.findByLabelText(t("join.nameLabel")), "Ayşe");
+    await userEvent.click(screen.getByRole("button", { name: t("join.join") }));
+    expect(await screen.findByText(t("join.full"))).toBeInTheDocument();
+  });
+
   it("maps auth/too-many-requests to a friendly hint", async () => {
     vi.mocked(checkGame).mockRejectedValue(Object.assign(new Error("Firebase: Error (auth/too-many-requests)."), { code: "auth/too-many-requests" }));
     await enterPin();

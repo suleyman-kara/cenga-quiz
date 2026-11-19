@@ -78,7 +78,7 @@ describe("HostGame", () => {
     expect(screen.getByText(new RegExp(window.location.host.replace(/[.:]/g, "\\$&")))).toBeInTheDocument();
     expect(screen.getByText("Oyuncu 0")).toBeInTheDocument();
     expect(screen.getByText("Oyuncu 1")).toBeInTheDocument();
-    expect(screen.getByText(t("hostGame.players", { count: 2 }))).toBeInTheDocument();
+    expect(screen.getByText(t("hostGame.playersOfMax", { count: 2, max: club.game.maxPlayers }))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.start") }));
     expect(hostCall).toHaveBeenCalledWith("startGame", { pin: "123456" });
   });
@@ -110,6 +110,13 @@ describe("HostGame", () => {
     await userEvent.click(screen.getByText(t("hostGame.playersPanel", { count: 1 })));
     expect(document.body.innerHTML).not.toMatch(/amk/i);
     expect(screen.getAllByText(t("hostGame.maskedName", { n: 1 })).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("lobby: shows count / max and a 'full' notice when the server marks the lobby full", () => {
+    vi.mocked(hooks.useMeta).mockReturnValue({ ...meta(), full: true, playerCount: 2 } as never);
+    renderHost();
+    expect(screen.getByText(t("hostGame.playersOfMax", { count: 2, max: club.game.maxPlayers }))).toBeInTheDocument();
+    expect(screen.getByText(t("hostGame.lobbyFull"))).toBeInTheDocument();
   });
 
   it("lobby: Start is disabled without players", () => {
