@@ -259,6 +259,20 @@ describe("RTDB: joining (players/{uid} write)", () => {
     await owner().ref(`${G}/meta/locked`).set(false);
     await assertSucceeds(join(OUTSIDER, "Ali"));
   });
+  it("a full lobby (meta.full) rejects new joins but still allows leaving", async () => {
+    await seed();
+    await owner().ref(`${G}/meta/full`).set(true);
+    await assertFails(join(OUTSIDER, "Ali"));
+    await assertSucceeds(player(P1).ref(`${G}/players/${P1}`).remove());
+    await owner().ref(`${G}/meta/full`).set(false);
+    await assertSucceeds(join(OUTSIDER, "Ali"));
+  });
+  it("clients may not write meta.full / playerCount / lastActivityAt", async () => {
+    await seed();
+    await assertFails(host().ref(`${G}/meta/full`).set(false));
+    await assertFails(player(P1).ref(`${G}/meta/playerCount`).set(0));
+    await assertFails(host().ref(`${G}/meta/lastActivityAt`).set(Date.now()));
+  });
   it("clients may not write banned or meta.locked", async () => {
     await seed();
     await assertFails(host().ref(`${G}/banned/${P1}`).set(true));

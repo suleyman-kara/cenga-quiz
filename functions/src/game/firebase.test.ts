@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { appOptions, emulatorDatabaseURL } from "./firebase";
+import { appOptions, databaseTriggerRegion, emulatorDatabaseURL } from "./firebase";
 
 describe("emulatorDatabaseURL", () => {
   it("is undefined outside the database emulator", () => {
@@ -26,5 +26,14 @@ describe("appOptions (DATABASE_URL param)", () => {
     expect(appOptions(" https://p-default-rtdb.europe-west1.firebasedatabase.app ")).toEqual({
       databaseURL: "https://p-default-rtdb.europe-west1.firebasedatabase.app",
     });
+  });
+});
+
+describe("databaseTriggerRegion", () => {
+  it("is the functions region (= the RTDB instance's location) in production", () => {
+    expect(databaseTriggerRegion({}, "europe-west1")).toBe("europe-west1");
+  });
+  it("is us-central1 in the emulator, the only region the emulated RTDB delivers events to", () => {
+    expect(databaseTriggerRegion({ FUNCTIONS_EMULATOR: "true" }, "europe-west1")).toBe("us-central1");
   });
 });

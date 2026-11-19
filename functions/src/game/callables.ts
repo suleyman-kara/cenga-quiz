@@ -6,7 +6,8 @@ import { parseBool, parseHostAction, parsePin, parseQIndex, parseQuizId, parseUi
 import { stepStatus } from "../core/transitions";
 import { GameError } from "../core/errors";
 import { allocatePin, securePin } from "../core/pin";
-import { applyPatch, newRoom, type GameConfig, type Patch, type Room } from "../core/room";
+import { applyPatch, newRoom, type Patch, type Room } from "../core/room";
+import { gameConfig, namePrefix } from "./config";
 import {
   assertHost,
   guard,
@@ -33,8 +34,7 @@ import {
 } from "./rooms";
 import { database, firestore } from "./firebase";
 
-export const gameConfig: GameConfig = club.game;
-const namePrefix = club.locale === "en" ? "Player" : "Oyuncu";
+export { gameConfig };
 
 type Res<N extends HostAction> = Promise<HostActionMap[N]["res"]>;
 

@@ -8,9 +8,12 @@
  *   state:                GameState               (Functions write; any signed-in user reads)
  *   question:             PublicQuestion          (Functions write; NO correct answer; host + joined players read)
  *   reveal:               RevealData              (Functions write; host + joined players read)
- *   players/{uid}:        PlayerEntry             (player creates own once / deletes own, only in an unlocked
- *                                                  lobby and while state.lock is absent; never renamed by the
- *                                                  client; host reads all)
+ *   players/{uid}:        PlayerEntry             (player creates own once / deletes own, only in an unlocked,
+ *                                                  not-full lobby and while state.lock is absent; never renamed
+ *                                                  by the client — the join trigger may rename it right after
+ *                                                  the join (blocked → "Oyuncu N", duplicate → " (2)"), so
+ *                                                  clients show players/{uid}/name, not what they typed;
+ *                                                  host reads all)
  *   answers/{qIndex}/{uid}: AnswerEntry           (player writes own once, startedAt <= now < endsAt, no lock;
  *                                                  host reads; player reads own)
  *   scores/{uid}:         PlayerScore             (Functions write; player reads own; host reads all)
@@ -87,6 +90,18 @@ export interface GameMeta {
   locked?: boolean;
   /** set once the result is safely in Firestore gameResults/{pin}_{createdAt} */
   archived?: boolean;
+  /**
+   * Players currently in the room, maintained by the join/leave database triggers (eventually
+   * consistent: lags a join by the trigger's latency; absent until the first join).
+   */
+  playerCount?: number;
+  /** playerCount >= club.game.maxPlayers: new joins are rejected (rules). Set/cleared by the triggers. */
+  full?: boolean;
+  /**
+   * server ms of the last lobby activity (latest join, lock/unlock, kick). Cleanup treats a room
+   * as idle from max(state.updatedAt, lastActivityAt).
+   */
+  lastActivityAt?: number;
 }
 
 /** Host action currently holding the state lock (see GameState.lock). */

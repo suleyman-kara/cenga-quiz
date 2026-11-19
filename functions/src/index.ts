@@ -1,12 +1,15 @@
 import { setGlobalOptions } from "firebase-functions/options";
 import { onCall, HttpsError } from "firebase-functions/https";
 import { onSchedule } from "firebase-functions/scheduler";
+import { onValueCreated, onValueDeleted } from "firebase-functions/database";
 import { defineBoolean, defineInt } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import { FUNCTIONS_REGION } from "../../shared/types";
 import { GameError } from "./core/errors";
 import { dispatchHost } from "./game/callables";
 import { runCleanup } from "./game/cleanup";
+import { onPlayerJoined, onPlayerLeft } from "./game/joins";
+import { databaseTriggerRegion } from "./game/firebase";
 
 setGlobalOptions({ region: FUNCTIONS_REGION, maxInstances: 10 });
 
@@ -41,3 +44,23 @@ export const cleanupGames = onSchedule(
     logger.info("cleanupGames", summary);
   },
 );
+
+/**
+ * Join/leave triggers on the default RTDB instance ("<project>-default-rtdb"; in the emulator the
+ * demo project's "<id>-default-rtdb" namespace the clients use). A 2nd-gen database trigger must
+ * run in the database's own location: FUNCTIONS_REGION must be the instance's region.
+ */
+const PLAYER_REF = {
+  ref: "/games/{pin}/players/{uid}",
+  instance: "*-default-rtdb",
+  region: databaseTriggerRegion(process.env, FUNCTIONS_REGION),
+};
+
+/** Sanitizes the name right away and keeps meta.playerCount / full / lastActivityAt current. */
+export const playerJoined = onValueCreated(PLAYER_REF, async (event) => {
+  await onPlayerJoined(event.params.pin, event.params.uid, event.data.val());
+});
+
+export const playerLeft = onValueDeleted(PLAYER_REF, async (event) => {
+  await onPlayerLeft(event.params.pin);
+});

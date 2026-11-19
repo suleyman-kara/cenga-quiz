@@ -43,6 +43,15 @@ export function emulatorDatabaseURL(env: Record<string, string | undefined>): st
   return projectId?.startsWith("demo-") ? `https://${projectId}-default-rtdb.firebaseio.com` : undefined;
 }
 
+/**
+ * Region for the RTDB triggers. In production a 2nd-gen database trigger must run in the
+ * database instance's own location (deploy rejects/never fires otherwise), i.e. the functions
+ * region. The Functions emulator only delivers database events to us-central1 functions.
+ */
+export function databaseTriggerRegion(env: Record<string, string | undefined>, functionsRegion: string): string {
+  return env.FUNCTIONS_EMULATOR === "true" ? "us-central1" : functionsRegion;
+}
+
 let rtdb: Promise<Database> | undefined;
 let fs: Promise<Firestore> | undefined;
 
