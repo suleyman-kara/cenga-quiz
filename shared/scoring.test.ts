@@ -10,8 +10,8 @@ import {
   type ScoreQuestionInput,
 } from "./scoring";
 
-const RULES: ScoringRules = { maxPoints: 1000, streakBonus: { enabled: true, perStreak: 100, max: 500 } };
-const NO_STREAK: ScoringRules = { maxPoints: 1000, streakBonus: { enabled: false, perStreak: 100, max: 500 } };
+const RULES: ScoringRules = { maxPoints: 1000, streakBonus: { enabled: true, steps: [40, 70, 90, 100] } };
+const NO_STREAK: ScoringRules = { maxPoints: 1000, streakBonus: { enabled: false, steps: [40, 70, 90, 100] } };
 
 const T0 = 1_700_000_000_000;
 const DUR = 20_000;
@@ -106,19 +106,27 @@ describe("streakBonus", () => {
     expect(streakBonus(1, RULES)).toBe(0);
   });
 
-  it("grows by perStreak per consecutive correct", () => {
-    expect(streakBonus(2, RULES)).toBe(100);
-    expect(streakBonus(3, RULES)).toBe(200);
-    expect(streakBonus(6, RULES)).toBe(500);
+  it("follows the step table: +40, +70, +90, +100", () => {
+    expect(streakBonus(2, RULES)).toBe(40);
+    expect(streakBonus(3, RULES)).toBe(70);
+    expect(streakBonus(4, RULES)).toBe(90);
+    expect(streakBonus(5, RULES)).toBe(100);
   });
 
-  it("is capped at max", () => {
-    expect(streakBonus(7, RULES)).toBe(500);
-    expect(streakBonus(100, RULES)).toBe(500);
+  it("each step adds less than the previous one", () => {
+    const b = [2, 3, 4, 5].map((s) => streakBonus(s, RULES));
+    const inc = b.map((v, i) => v - (i === 0 ? 0 : b[i - 1]));
+    for (let i = 1; i < inc.length; i++) expect(inc[i]).toBeLessThan(inc[i - 1]);
   });
 
-  it("is 0 when disabled", () => {
+  it("stays at the last step for longer streaks", () => {
+    expect(streakBonus(6, RULES)).toBe(100);
+    expect(streakBonus(100, RULES)).toBe(100);
+  });
+
+  it("is 0 when disabled or the table is empty", () => {
     expect(streakBonus(5, NO_STREAK)).toBe(0);
+    expect(streakBonus(5, { maxPoints: 1000, streakBonus: { enabled: true, steps: [] } })).toBe(0);
   });
 
   it("is 0 for streak 0 or negative", () => {
@@ -243,14 +251,26 @@ describe("scoreQuestion", () => {
         prevScores: { a: score({ score: 2000, streak: 2, correctCount: 2 }) },
       }),
     );
-    // streak becomes 3 → bonus 200
+    // streak becomes 3 → bonus 70
     expect(res.scores.a.streak).toBe(3);
-    expect(res.scores.a.lastDelta).toBe(1200);
-    expect(res.scores.a.score).toBe(3200);
+    expect(res.scores.a.lastDelta).toBe(1070);
+    expect(res.scores.a.score).toBe(3070);
     expect(res.scores.a.correctCount).toBe(3);
   });
 
-  it("caps streak bonus at max", () => {
+  it("one question is worth at most 1100 (instant answer on a long streak)", () => {
+    const res = scoreQuestion(
+      input({
+        players: { a: player("A") },
+        answers: { a: ans(0, 0) },
+        correct: 0,
+        prevScores: { a: score({ score: 9000, streak: 20, correctCount: 20 }) },
+      }),
+    );
+    expect(res.scores.a.lastDelta).toBe(1100);
+  });
+
+  it("caps streak bonus at the last step", () => {
     const res = scoreQuestion(
       input({
         players: { a: player("A") },
@@ -259,7 +279,7 @@ describe("scoreQuestion", () => {
       }),
     );
     expect(res.scores.a.streak).toBe(21);
-    expect(res.scores.a.lastDelta).toBe(1500);
+    expect(res.scores.a.lastDelta).toBe(1100);
   });
 
   it("no streak bonus when disabled, but streak still counts", () => {
@@ -449,14 +469,14 @@ describe("scoreQuestion", () => {
     expect(r.scores.a.score).toBe(1000);
     expect(r.scores.b.score).toBe(500);
     prev = r.scores;
-    // Q2: a correct (streak 2 → +100), b wrong
+    // Q2: a correct (streak 2 → +40), b wrong
     r = scoreQuestion(input({ players, answers: { a: ans(1, 0), b: ans(0, 0) }, correct: 1, prevScores: prev }));
-    expect(r.scores.a.score).toBe(2100);
+    expect(r.scores.a.score).toBe(2040);
     expect(r.scores.b.score).toBe(500);
     prev = r.scores;
     // Q3: b correct (streak 1), a no answer
     r = scoreQuestion(input({ players, answers: { b: ans(3, 0) }, correct: 3, prevScores: prev }));
-    expect(r.scores.a).toMatchObject({ score: 2100, streak: 0, correctCount: 2, rank: 1, lastAnswered: false });
+    expect(r.scores.a).toMatchObject({ score: 2040, streak: 0, correctCount: 2, rank: 1, lastAnswered: false });
     expect(r.scores.b).toMatchObject({ score: 1500, streak: 1, correctCount: 2, rank: 2, lastDelta: 1000 });
   });
 });

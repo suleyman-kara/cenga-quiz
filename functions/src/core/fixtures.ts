@@ -4,7 +4,7 @@ import type { GameConfig, Room } from "./room";
 export const config: GameConfig = {
   defaultQuestionSeconds: 20,
   maxPoints: 1000,
-  streakBonus: { enabled: true, perStreak: 100, max: 500 },
+  streakBonus: { enabled: true, steps: [40, 70, 90, 100] },
   leaderboardSize: 2,
   maxPlayers: 3,
   leadInMs: 0,

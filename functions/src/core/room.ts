@@ -15,7 +15,7 @@ import { questionSeconds } from "../../../shared/quizValidate";
 export interface GameConfig {
   defaultQuestionSeconds: number;
   maxPoints: number;
-  streakBonus: { enabled: boolean; perStreak: number; max: number };
+  streakBonus: { enabled: boolean; steps: readonly number[] };
   leaderboardSize: number;
   maxPlayers: number;
   /** question published this long before its clock starts (state.startedAt) */

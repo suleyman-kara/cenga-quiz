@@ -122,7 +122,7 @@ describe("planReveal", () => {
       scores: { p1: { score: 500, streak: 1, rank: 1, lastDelta: 500, lastCorrect: true, lastAnswered: true, correctCount: 1 } },
     }) as Room;
     const out = applyPatch(r, planReveal(r, { ...host, now: 20_000 })) as Room;
-    expect(out.scores?.p1).toMatchObject({ score: 500 + 1000 + 100, streak: 2, correctCount: 2 });
+    expect(out.scores?.p1).toMatchObject({ score: 500 + 1000 + 40, streak: 2, correctCount: 2 });
     expect(out.scores?.p2).toMatchObject({ score: 0, lastAnswered: false });
   });
 

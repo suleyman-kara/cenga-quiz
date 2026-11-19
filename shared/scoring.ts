@@ -3,7 +3,11 @@ import type { AnswerEntry, Leaderboard, LeaderboardEntry, PlayerEntry, PlayerSco
 
 export interface ScoringRules {
   maxPoints: number;
-  streakBonus: { enabled: boolean; perStreak: number; max: number };
+  /**
+   * steps[i] = bonus for a streak of i + 2 consecutive correct answers (the first correct
+   * answer has no bonus); longer streaks keep the last step. Increments should shrink.
+   */
+  streakBonus: { enabled: boolean; steps: readonly number[] };
 }
 
 export function emptyScore(): PlayerScore {
@@ -21,9 +25,10 @@ export function questionPoints(elapsedMs: number, durationMs: number, maxPoints:
 
 /** streak = consecutive corrects INCLUDING this one. */
 export function streakBonus(streak: number, rules: ScoringRules): number {
-  const { enabled, perStreak, max } = rules.streakBonus;
-  if (!enabled || !(streak > 1)) return 0;
-  return Math.max(0, Math.min((streak - 1) * perStreak, max));
+  const { enabled, steps } = rules.streakBonus;
+  if (!enabled || !(streak > 1) || steps.length === 0) return 0;
+  const v = steps[Math.min(Math.floor(streak) - 2, steps.length - 1)];
+  return Number.isFinite(v) ? Math.max(0, v) : 0;
 }
 
 function compareKeys(a: string, b: string): number {

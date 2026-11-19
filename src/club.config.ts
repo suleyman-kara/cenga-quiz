@@ -85,7 +85,11 @@ export interface ClubConfig {
   game: {
     defaultQuestionSeconds: number;
     maxPoints: number;
-    streakBonus: { enabled: boolean; perStreak: number; max: number };
+    /**
+     * Seri bonusu: steps[i] = art arda (i + 2). doğru cevaptaki ek puan; daha uzun seriler son
+     * adımda kalır. Bir sorudan en fazla maxPoints + son adım alınır. Artışlar küçülmeli.
+     */
+    streakBonus: { enabled: boolean; steps: number[] };
     leaderboardSize: number;
     maxPlayers: number;
     /** Bu kadar saat hareketsiz kalan odalar zamanlanmış görevle kapatılır */
@@ -187,7 +191,8 @@ export const club: ClubConfig = {
   game: {
     defaultQuestionSeconds: 20,
     maxPoints: 1000,
-    streakBonus: { enabled: true, perStreak: 100, max: 500 },
+    // +40, +70, +90, +100: her adımda artış 10 azalır; soru başına en fazla 1000 + 100 = 1100
+    streakBonus: { enabled: true, steps: [40, 70, 90, 100] },
     leaderboardSize: 5,
     maxPlayers: 300,
     abandonedAfterHours: 6,
