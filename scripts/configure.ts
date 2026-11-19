@@ -15,7 +15,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { parseFirebaseConfig, buildOutputs } from "./lib/firebaseConfig";
+import { parseFirebaseConfig, buildOutputs, mergeEnvFile } from "./lib/firebaseConfig";
 
 const root = join(import.meta.dirname, "..");
 const args = process.argv.slice(2);
@@ -41,7 +41,8 @@ const files: [string, string][] = [
 for (const [rel, content] of files) {
   const p = join(root, rel);
   console.log(`${existsSync(p) ? "↻ güncellendi" : "+ oluşturuldu"}: ${rel}`);
-  writeFileSync(p, content);
+  const isEnv = rel.includes(".env");
+  writeFileSync(p, isEnv && existsSync(p) ? mergeEnvFile(content, readFileSync(p, "utf8")) : content);
 }
 console.log(`\n✓ Proje: ${parsed.config.projectId}`);
 console.log("Sıradaki adımlar: docs/firebase-kurulum.md → 'Deploy' bölümü (npm run deploy).");

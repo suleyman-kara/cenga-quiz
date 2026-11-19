@@ -49,6 +49,8 @@ yayına almak içindir. Toplam süre: ~30 dakika (ilk Functions deploy'u 5-10 dk
    Bu komut şu dosyaları üretir (hepsi git dışı):
    `.firebaserc`, `.env.production.local`, `functions/.env.<proje-kimliği>`.
    Realtime Database `europe-west1`'de değilse uyarı verir.
+   Komutu tekrar çalıştırmak güvenlidir: `.env` dosyalarına elle eklediğin satırlar
+   (ör. `MIN_INSTANCES`, `ENFORCE_APP_CHECK`) ve mevcut reCAPTCHA site anahtarı korunur.
 
 ## 4. Deploy
 

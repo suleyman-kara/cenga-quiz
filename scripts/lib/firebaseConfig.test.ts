@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFirebaseConfig, buildOutputs } from "./firebaseConfig";
+import { parseFirebaseConfig, buildOutputs, mergeEnvFile } from "./firebaseConfig";
 
 const SNIPPET = `
 // Import the functions you need from the SDKs you need
@@ -73,5 +73,42 @@ describe("buildOutputs", () => {
     expect(out.webEnv).not.toContain("VITE_USE_EMULATORS");
     expect(out.functionsEnvFile).toBe("functions/.env.kulup-quiz");
     expect(out.functionsEnv).toContain("DATABASE_URL=https://kulup-quiz-default-rtdb.europe-west1.firebasedatabase.app");
+  });
+});
+
+describe("mergeEnvFile", () => {
+  const HEADER = "# configure script tarafından üretildi\n";
+
+  it("returns the generated content when there is no existing file", () => {
+    const gen = HEADER + "DATABASE_URL=https://a\n";
+    expect(mergeEnvFile(gen, undefined)).toBe(gen);
+  });
+
+  it("keeps lines the script does not manage (e.g. ENFORCE_APP_CHECK, MIN_INSTANCES)", () => {
+    const existing = HEADER + "DATABASE_URL=https://old\nMIN_INSTANCES=1\nENFORCE_APP_CHECK=true\n";
+    const gen = HEADER + "DATABASE_URL=https://new\n";
+    expect(mergeEnvFile(gen, existing)).toBe(
+      HEADER + "DATABASE_URL=https://new\nMIN_INSTANCES=1\nENFORCE_APP_CHECK=true\n",
+    );
+  });
+
+  it("generated non-empty values win over existing ones", () => {
+    const existing = "VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=old-key\n";
+    const gen = HEADER + "VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=new-key\n";
+    expect(mergeEnvFile(gen, existing)).toBe(HEADER + "VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=new-key\n");
+  });
+
+  it("an empty generated value does not erase an existing one (configure without --recaptcha)", () => {
+    const existing = HEADER + "VITE_FIREBASE_APP_ID=x\nVITE_RECAPTCHA_ENTERPRISE_SITE_KEY=site-key\n";
+    const gen = HEADER + "VITE_FIREBASE_APP_ID=y\nVITE_RECAPTCHA_ENTERPRISE_SITE_KEY=\n";
+    expect(mergeEnvFile(gen, existing)).toBe(
+      HEADER + "VITE_FIREBASE_APP_ID=y\nVITE_RECAPTCHA_ENTERPRISE_SITE_KEY=site-key\n",
+    );
+  });
+
+  it("keeps user comments, drops the old generated header and blank lines, handles CRLF", () => {
+    const existing = HEADER.replace("\n", "\r\n") + "DATABASE_URL=https://old\r\n\r\n# etkinlik günü\r\nMIN_INSTANCES=1\r\n";
+    const gen = HEADER + "DATABASE_URL=https://new\n";
+    expect(mergeEnvFile(gen, existing)).toBe(HEADER + "DATABASE_URL=https://new\n# etkinlik günü\nMIN_INSTANCES=1\n");
   });
 });

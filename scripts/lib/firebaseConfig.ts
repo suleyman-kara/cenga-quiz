@@ -88,3 +88,44 @@ export function buildOutputs(cfg: WebConfig, opts: { recaptchaSiteKey?: string }
     functionsEnv: header + `DATABASE_URL=${cfg.databaseURL}\n`,
   };
 }
+
+const ENV_LINE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
+
+/**
+ * Merges a freshly generated .env file with the one already on disk, so re-running
+ * `npm run configure` never silently drops what the user added by hand:
+ * - generated keys win, except that an empty generated value keeps an existing non-empty
+ *   one (re-running without --recaptcha must not switch App Check off);
+ * - keys the script does not manage (MIN_INSTANCES, ENFORCE_APP_CHECK, …) and the user's
+ *   comments are kept, after the generated lines;
+ * - the old generated header and blank lines are dropped. Output uses \n line endings.
+ */
+export function mergeEnvFile(generated: string, existing: string | undefined): string {
+  if (existing === undefined) return generated;
+  const genLines = generated.replace(/\r\n/g, "\n").split("\n").filter((l) => l !== "");
+  const oldLines = existing.replace(/\r\n/g, "\n").split("\n").filter((l) => l.trim() !== "");
+  const header = genLines.find((l) => l.startsWith("#"));
+
+  const oldValues = new Map<string, string>();
+  for (const l of oldLines) {
+    const m = ENV_LINE.exec(l);
+    if (m) oldValues.set(m[1], m[2]);
+  }
+
+  const genKeys = new Set<string>();
+  const merged = genLines.map((l) => {
+    const m = ENV_LINE.exec(l);
+    if (!m) return l;
+    genKeys.add(m[1]);
+    const old = oldValues.get(m[1]);
+    return m[2] === "" && old ? `${m[1]}=${old}` : l;
+  });
+
+  const kept = oldLines.filter((l) => {
+    const m = ENV_LINE.exec(l);
+    if (m) return !genKeys.has(m[1]);
+    return l !== header;
+  });
+
+  return [...merged, ...kept].join("\n") + "\n";
+}
