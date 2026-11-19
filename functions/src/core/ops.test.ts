@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planStart, planReveal, planShowLeaderboard, planNext, planEnd } from "./ops";
+import { planStart, planReveal, planShowLeaderboard, planNext, planEnd, planKick, planSetLobbyLocked } from "./ops";
 import { applyPatch, type Room } from "./room";
 import { GameError } from "./errors";
 import { config, lobbyRoom, quiz } from "./fixtures";
@@ -40,9 +40,16 @@ describe("planStart", () => {
   it("requires at least one player", () => {
     expect(errCode(() => planStart(lobbyRoom({}), { ...host, now: 1 }))).toBe("failed-precondition");
   });
-  it("refuses more than maxPlayers", () => {
-    const r = lobbyRoom({ a: "A", b: "B", c: "C", d: "D" });
-    expect(errCode(() => planStart(r, { ...host, now: 1 }))).toBe("failed-precondition");
+  it("keeps the earliest maxPlayers by joinedAt and removes the rest instead of failing", () => {
+    const r = lobbyRoom({ a: "A", b: "B", c: "C", d: "D", e: "E" });
+    const joined: Record<string, number> = { a: 50, b: 10, c: 40, d: 20, e: 30 };
+    for (const uid of Object.keys(joined)) r.players![uid].joinedAt = joined[uid];
+    const patch = planStart(r, { ...host, now: 1 }); // config.maxPlayers = 3
+    expect(patch["players/a"]).toBeNull();
+    expect(patch["players/c"]).toBeNull();
+    const out = applyPatch(r, patch) as Room;
+    expect(Object.keys(out.players!).sort()).toEqual(["b", "d", "e"]);
+    expect(out.state?.phase).toBe("question");
   });
   it("refuses when not in lobby", () => {
     expect(errCode(() => planStart(started(), { ...host, now: 1 }))).toBe("failed-precondition");
@@ -156,5 +163,43 @@ describe("planEnd", () => {
   it("refused when already ended", () => {
     const r = applyPatch(lobbyRoom(), { "state/phase": "ended" });
     expect(errCode(() => planEnd(r, { ...host, now: 1 }))).toBe("failed-precondition");
+  });
+});
+
+describe("planKick", () => {
+  it("removes the player and their score, bans them", () => {
+    const r = applyPatch(revealed(), {}) as Room;
+    const patch = planKick(r, { ...host, now: 1 }, "p2");
+    expect(patch).toMatchObject({ "players/p2": null, "scores/p2": null, "banned/p2": true });
+    const out = applyPatch(r, patch) as Room;
+    expect(out.players?.p2).toBeUndefined();
+    expect(out.banned).toEqual({ p2: true });
+  });
+  it("rewrites an existing leaderboard without the kicked player", () => {
+    const r = revealed(); // p1 950, p2 0
+    const out = applyPatch(r, planKick(r, { ...host, now: 1 }, "p1")) as Room;
+    expect(out.leaderboard).toEqual({ top: [{ name: "Ayşe", score: 0, rank: 1 }], playerCount: 1 });
+    expect(out.scores?.p2.rank).toBe(1);
+  });
+  it("works in the lobby (no leaderboard written) and for unknown uids", () => {
+    const patch = planKick(lobbyRoom(), { ...host, now: 1 }, "ghost");
+    expect(patch).toEqual({ "players/ghost": null, "scores/ghost": null, "banned/ghost": true });
+  });
+  it("host only, not after the game ended", () => {
+    expect(errCode(() => planKick(lobbyRoom(), { ...host, uid: "x", now: 1 }, "p1"))).toBe("permission-denied");
+    const ended = applyPatch(lobbyRoom(), { "state/phase": "ended" });
+    expect(errCode(() => planKick(ended, { ...host, now: 1 }, "p1"))).toBe("failed-precondition");
+  });
+});
+
+describe("planSetLobbyLocked", () => {
+  it("sets meta.locked", () => {
+    expect(planSetLobbyLocked(lobbyRoom(), { ...host, now: 1 }, true)).toEqual({ "meta/locked": true });
+    expect(planSetLobbyLocked(lobbyRoom(), { ...host, now: 1 }, false)).toEqual({ "meta/locked": false });
+  });
+  it("host only, not after the game ended", () => {
+    expect(errCode(() => planSetLobbyLocked(lobbyRoom(), { ...host, uid: "x", now: 1 }, true))).toBe("permission-denied");
+    const ended = applyPatch(lobbyRoom(), { "state/phase": "ended" });
+    expect(errCode(() => planSetLobbyLocked(ended, { ...host, now: 1 }, true))).toBe("failed-precondition");
   });
 });

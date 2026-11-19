@@ -206,11 +206,36 @@ describe("RTDB: joining (players/{uid} write)", () => {
     await seed();
     await assertSucceeds(host().ref(`${G}/players/${HOST_UID}`).set({ name: "Sunucu", joinedAt: serverTimestamp() }));
   });
-  it("player may update own name in lobby", async () => {
+  it("entries are write-once: no rename, no rewrite, no field updates", async () => {
     await seed();
-    await assertSucceeds(player(P1).ref(`${G}/players/${P1}`).update({ name: "Ayşe K" }));
-    await assertSucceeds(player(P1).ref(`${G}/players/${P1}/name`).set("Ayşe Y"));
-    await assertFails(player(P1).ref(`${G}/players/${P1}/name`).set("😀"));
+    await assertFails(player(P1).ref(`${G}/players/${P1}`).update({ name: "Ayşe K" }));
+    await assertFails(player(P1).ref(`${G}/players/${P1}/name`).set("Ayşe Y"));
+    await assertFails(player(P1).ref(`${G}/players/${P1}`).set({ name: "Ayşe Z", joinedAt: serverTimestamp() }));
+  });
+  it("a player may leave and join again", async () => {
+    await seed();
+    await assertSucceeds(player(P1).ref(`${G}/players/${P1}`).remove());
+    await assertSucceeds(join(P1, "Ayşe"));
+  });
+  it("a banned (kicked) player may not join again", async () => {
+    await seed();
+    await owner().ref(`${G}/banned/${OUTSIDER}`).set(true);
+    await assertFails(join(OUTSIDER, "Ali"));
+    await assertSucceeds(join("someone-else", "Veli"));
+  });
+  it("a locked lobby rejects new joins but still allows leaving", async () => {
+    await seed();
+    await owner().ref(`${G}/meta/locked`).set(true);
+    await assertFails(join(OUTSIDER, "Ali"));
+    await assertSucceeds(player(P1).ref(`${G}/players/${P1}`).remove());
+    await owner().ref(`${G}/meta/locked`).set(false);
+    await assertSucceeds(join(OUTSIDER, "Ali"));
+  });
+  it("clients may not write banned or meta.locked", async () => {
+    await seed();
+    await assertFails(host().ref(`${G}/banned/${P1}`).set(true));
+    await assertFails(player(P1).ref(`${G}/banned/${P1}`).remove());
+    await assertFails(host().ref(`${G}/meta/locked`).set(true));
   });
   it("player may not change joinedAt to an arbitrary value", async () => {
     await seed();
