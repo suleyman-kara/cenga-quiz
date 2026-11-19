@@ -1,5 +1,6 @@
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { app, useEmulators } from "./firebase";
+import { EMULATORS } from "./config/firebaseConfig";
 
 export const firestore = getFirestore(app);
-if (useEmulators) connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
+if (import.meta.env.DEV && useEmulators) connectFirestoreEmulator(firestore, EMULATORS.host, EMULATORS.ports.firestore);

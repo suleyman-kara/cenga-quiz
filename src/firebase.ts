@@ -1,50 +1,71 @@
-import { initializeApp, type FirebaseOptions } from "firebase/app";
+import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
-import { connectDatabaseEmulator, getDatabase } from "firebase/database";
+import { connectDatabaseEmulator, forceLongPolling, getDatabase } from "firebase/database";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
-import { FUNCTIONS_REGION, type CallableContract, type CallableName } from "../shared/types";
+import {
+  FUNCTIONS_REGION,
+  HOST_CALLABLE,
+  type HostAction,
+  type HostActionMap,
+  type HostRequest,
+  type HostResponse,
+} from "../shared/types";
+import { EMULATORS, resolveFirebaseConfig } from "./config/firebaseConfig";
+import { wantsLongPolling } from "./config/longPolling";
 
+/**
+ * Firebase bootstrap. Firestore lives in ./firestore.ts so the player bundle does not load it.
+ *
+ * Emulators only in a dev server (see resolveFirebaseConfig). The `import.meta.env.DEV` checks are
+ * static, so a production bundle contains neither the emulator addresses nor the connect calls.
+ * A production build with missing config throws a ConfigError (main.tsx shows a friendly screen).
+ */
 const env = import.meta.env;
-const DEMO_PROJECT = "demo-club-quiz";
+const config = import.meta.env.DEV
+  ? resolveFirebaseConfig(env, EMULATORS)
+  : resolveFirebaseConfig({ ...env, DEV: false });
 
-/** Emulators when explicitly requested, or in dev when no real project is configured. */
-/** Firestore lives in ./firestore.ts so the player bundle does not load it. */
-export const useEmulators =
-  env.VITE_USE_EMULATORS === "true" || (env.DEV && !env.VITE_FIREBASE_PROJECT_ID);
+export const useEmulators = config.useEmulators;
+export const app = initializeApp(config.options);
 
-const options: FirebaseOptions = useEmulators
-  ? {
-      apiKey: "demo-key",
-      projectId: DEMO_PROJECT,
-      authDomain: `${DEMO_PROJECT}.firebaseapp.com`,
-      databaseURL: `http://127.0.0.1:9000?ns=${DEMO_PROJECT}-default-rtdb`,
-      appId: "demo-app",
-    }
-  : {
-      apiKey: env.VITE_FIREBASE_API_KEY,
-      authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId: env.VITE_FIREBASE_PROJECT_ID,
-      databaseURL: env.VITE_FIREBASE_DATABASE_URL,
-      appId: env.VITE_FIREBASE_APP_ID,
-    };
+// App Check must be active before the other services make requests. Loaded on demand so the
+// player bundle stays lean when no site key is configured.
+const siteKey = env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY?.trim();
+if (siteKey) {
+  if (import.meta.env.DEV && env.VITE_APP_CHECK_DEBUG_TOKEN) {
+    (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
+      env.VITE_APP_CHECK_DEBUG_TOKEN;
+  }
+  try {
+    const { initializeAppCheck, ReCaptchaEnterpriseProvider } = await import("firebase/app-check");
+    initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(siteKey), isTokenAutoRefreshEnabled: true });
+  } catch (err) {
+    // Without App Check the app still works while enforcement is off; never block the game on it.
+    console.error("App Check could not start", err);
+  }
+}
 
-export const app = initializeApp(options);
+// `?lp=1`: venue networks that block WebSockets can force long polling (must precede getDatabase).
+if (typeof window !== "undefined" && wantsLongPolling(window.location.search)) forceLongPolling();
+
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 export const functions = getFunctions(app, FUNCTIONS_REGION);
 
-if (useEmulators) {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectDatabaseEmulator(db, "127.0.0.1", 9000);
-  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+if (import.meta.env.DEV && useEmulators) {
+  const { host, ports } = EMULATORS;
+  connectAuthEmulator(auth, `http://${host}:${ports.auth}`, { disableWarnings: true });
+  connectDatabaseEmulator(db, host, ports.database);
+  connectFunctionsEmulator(functions, host, ports.functions);
 }
 
-/** Typed wrapper around the HTTPS callables declared in shared/types.ts. */
-export async function call<Name extends CallableName>(
-  name: Name,
-  req: CallableContract[Name]["req"],
-): Promise<CallableContract[Name]["res"]> {
-  const fn = httpsCallable<CallableContract[Name]["req"], CallableContract[Name]["res"]>(functions, name);
-  const result = await fn(req);
-  return result.data;
+const hostFn = httpsCallable<HostRequest, HostResponse>(functions, HOST_CALLABLE);
+
+/** Typed wrapper around the single `host` dispatcher callable (see HostActionMap in shared/types.ts). */
+export async function hostCall<A extends HostAction>(
+  action: A,
+  args: HostActionMap[A]["req"],
+): Promise<HostActionMap[A]["res"]> {
+  const result = await hostFn({ action, ...args } as HostRequest);
+  return result.data as HostActionMap[A]["res"];
 }

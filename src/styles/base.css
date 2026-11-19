@@ -450,3 +450,25 @@ a {
   width: 100%;
   margin-inline: auto;
 }
+
+/* ---------- fatal screens (config missing / crash) ---------- */
+.fatal {
+  min-height: 70vh;
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+.fatal__logo {
+  width: min(220px, 60vw);
+  height: auto;
+}
+
+.fatal__detail {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--fs-sm, 0.875rem);
+  color: var(--color-text-muted);
+  background: var(--tint);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  overflow-wrap: anywhere;
+}
