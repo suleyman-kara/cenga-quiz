@@ -73,6 +73,29 @@ describe("runCleanup", () => {
     expect(doc.expireAt.toMillis()).toBe(doc.endedAt + club.game.resultsRetentionDays * 24 * HOUR);
   });
 
+  it("a corrupt room or snapshot is logged and skipped; the rest is still cleaned up", async () => {
+    const now = Date.now();
+    const abandoned = now - (club.game.abandonedAfterHours * HOUR + MIN);
+    const corrupt = room("reveal", abandoned, true, false);
+    // meta.createdAt is part of the result doc id: "a/b" makes the Firestore path invalid
+    (corrupt.meta as Record<string, unknown>).createdAt = "a/b";
+    await adminDb()
+      .ref("games")
+      .set({ "100000": corrupt, "100001": room("lobby", abandoned), "100002": room("reveal", abandoned, true, false) });
+    // a snapshot id that is not a valid RTDB key, then a normal orphan
+    const snap = { hostUid: "h1", quizId: "q1", quiz: { title: "x", questions: [] }, createdAt: abandoned };
+    await adminFs().doc("liveGames/bad.id").set({ pin: "bad.id", ...snap });
+    await adminFs().doc("liveGames/100009").set({ pin: "100009", ...snap });
+
+    const summary = await runCleanup(now);
+
+    const games = (await adminDb().ref("games").get()).val() ?? {};
+    expect(Object.keys(games)).toEqual(["100000"]); // left for a later run / manual look
+    expect((await adminFs().doc("gameResults/100002_" + (abandoned - HOUR)).get()).exists).toBe(true);
+    expect((await adminFs().doc("liveGames/100009").get()).exists).toBe(false);
+    expect(summary).toMatchObject({ removed: 2, archived: 1, orphanSnapshots: 1, failed: 2 });
+  });
+
   it("is a no-op on an empty database", async () => {
     await expect(runCleanup(Date.now())).resolves.toMatchObject({ removed: 0, archived: 0 });
   });
