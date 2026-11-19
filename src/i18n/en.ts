@@ -118,6 +118,8 @@ export const en = {
   "errors.permissionDenied": "That isn't allowed right now.",
   "errors.network": "Connection problem. Check your internet and try again.",
   "errors.generic": "Something went wrong. Please try again.",
+  "errors.popupBlocked": "The sign-in popup was blocked. Allow popups and try again.",
+  "errors.unauthorizedDomain": "This domain is not authorized in Firebase (Authentication → Settings → Authorized domains).",
 } as const;
 
 export type MessageKey = keyof typeof en;

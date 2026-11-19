@@ -120,4 +120,6 @@ export const tr: Messages = {
   "errors.permissionDenied": "Bu işleme şu an izin verilmiyor.",
   "errors.network": "Bağlantı sorunu. İnternetini kontrol edip tekrar dene.",
   "errors.generic": "Bir sorun oluştu. Lütfen tekrar dene.",
+  "errors.popupBlocked": "Açılır pencere engellendi, izin verip tekrar dene.",
+  "errors.unauthorizedDomain": "Bu alan adı Firebase'de yetkilendirilmemiş (Authentication → Settings → Authorized domains).",
 };

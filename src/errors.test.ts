@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { errorCode, friendlyError, isPermissionDenied } from "./errors";
+import { errorCode, friendlyError, isPermissionDenied, isSilentAuthError } from "./errors";
 import { translate } from "./i18n";
 import { club } from "./club.config";
 
@@ -48,5 +48,17 @@ describe("friendlyError", () => {
   it("other functions errors and unknown errors are generic (no raw internals)", () => {
     expect(friendlyError(withCode("functions/internal", "internal"))).toBe(t("errors.generic"));
     expect(friendlyError(new Error("TypeError: x is undefined"))).toBe(t("errors.generic"));
+  });
+});
+
+describe("sign-in errors", () => {
+  it("explains a blocked popup and an unauthorized domain", () => {
+    expect(friendlyError(withCode("auth/popup-blocked"))).toBe(t("errors.popupBlocked"));
+    expect(friendlyError(withCode("auth/unauthorized-domain"))).toBe(t("errors.unauthorizedDomain"));
+  });
+  it("closing / superseding the popup is silent", () => {
+    expect(isSilentAuthError(withCode("auth/popup-closed-by-user"))).toBe(true);
+    expect(isSilentAuthError(withCode("auth/cancelled-popup-request"))).toBe(true);
+    expect(isSilentAuthError(withCode("auth/popup-blocked"))).toBe(false);
   });
 });

@@ -24,9 +24,15 @@ const NETWORK = new Set(["unavailable", "deadline-exceeded", "auth/network-reque
 /** Callable codes whose HttpsError message is written for people (Turkish, from functions/). */
 const SERVER_MESSAGE = new Set(["failed-precondition", "permission-denied", "not-found", "resource-exhausted"]);
 
+/** The user closed the sign-in popup (or opened a second one): nothing to report. */
+const SILENT_AUTH = new Set(["auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/user-cancelled"]);
+export const isSilentAuthError = (err: unknown) => SILENT_AUTH.has(errorCode(err));
+
 /** A message safe to show a player or host, in the club's locale. */
 export function friendlyError(err: unknown): string {
   const code = errorCode(err);
+  if (code === "auth/popup-blocked") return t("errors.popupBlocked");
+  if (code === "auth/unauthorized-domain") return t("errors.unauthorizedDomain");
   if (code === "auth/too-many-requests") return t("errors.tooManyRequests");
   if (NETWORK.has(code)) return t("errors.network");
   if (isFunctionsError(err) && SERVER_MESSAGE.has(code)) {
