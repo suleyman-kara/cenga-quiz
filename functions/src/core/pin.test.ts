@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { allocatePin } from "./pin";
+import { allocatePin, securePin } from "./pin";
+import { isValidPin } from "../../../shared/pin";
 import { GameError } from "./errors";
 
 describe("allocatePin", () => {
@@ -31,5 +32,21 @@ describe("allocatePin", () => {
       throw new Error("db down");
     });
     await expect(allocatePin(claim, () => "123456")).rejects.toThrow("db down");
+  });
+});
+
+describe("securePin", () => {
+  it("draws from a CSPRNG integer range [100000, 1000000)", () => {
+    const calls: [number, number][] = [];
+    const fake = (min: number, max: number) => {
+      calls.push([min, max]);
+      return 100000;
+    };
+    expect(securePin(fake)).toBe("100000");
+    expect(calls).toEqual([[100000, 1000000]]);
+    expect(securePin(() => 999999)).toBe("999999");
+  });
+  it("defaults to node:crypto and always yields a valid PIN", () => {
+    for (let i = 0; i < 500; i++) expect(isValidPin(securePin())).toBe(true);
   });
 });
