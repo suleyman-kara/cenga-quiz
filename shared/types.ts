@@ -76,6 +76,19 @@ export interface GameMeta {
   questionCount: number;
 }
 
+/** Host action currently holding the state lock (see GameState.lock). */
+export type LockAction = "start" | "reveal" | "showLeaderboard" | "next" | "end";
+
+/**
+ * Server-only transition lock. While present (and fresher than ~30 s) the room's inputs are
+ * frozen: rules reject joins/leaves and answers. Removed by the transition's final write.
+ */
+export interface StateLock {
+  by: LockAction;
+  /** server ms when the lock was taken; older than 30 s = stale (crashed call), may be overridden */
+  at: number;
+}
+
 export interface GameState {
   phase: Phase;
   /** -1 in lobby */
@@ -84,6 +97,8 @@ export interface GameState {
   startedAt: number;
   endsAt: number;
   updatedAt: number;
+  /** present only while a host transition is computing its result */
+  lock?: StateLock;
 }
 
 export interface PublicQuestion {

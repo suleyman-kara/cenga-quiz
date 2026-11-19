@@ -19,7 +19,7 @@ export interface OpContext {
 
 type ActiveRoom = Room & Required<Pick<Room, "meta" | "state">>;
 
-function guard(room: Room | null | undefined, ctx: OpContext, action: GameAction): ActiveRoom {
+export function guard(room: Room | null | undefined, ctx: OpContext, action: GameAction): ActiveRoom {
   if (!room?.meta || !room.state) throw new GameError("not-found", "Oyun bulunamadı.");
   if (room.meta.hostUid !== ctx.uid) throw new GameError("permission-denied", "Bu oyunun sunucusu değilsiniz.");
   assertTransition(room.state.phase, action);
