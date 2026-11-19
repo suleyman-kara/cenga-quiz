@@ -1,6 +1,6 @@
 /** Scheduled housekeeping core — plain async so tests can call it directly. */
 import { club } from "../../../src/club.config";
-import { buildGameResult } from "../core/archive";
+import { buildGameResult, resultIdFor } from "../core/archive";
 import { classifyRoom, type CleanupOptions } from "../core/cleanup";
 import type { Room } from "../core/room";
 import { database, firestore } from "./firebase";
@@ -30,7 +30,9 @@ export async function runCleanup(now: number, opts: CleanupOptions = cleanupOpti
     const action = classifyRoom(room, now, opts);
     if (action === "keep") continue;
     if (action === "archive-remove") {
-      await fs.collection("gameResults").add(buildGameResult(room!, { pin, now }));
+      // Deterministic id + set(): a result already written by a crashed endGame is overwritten, never duplicated.
+      const doc = buildGameResult(room!, { pin, now, retentionDays: club.game.resultsRetentionDays });
+      await fs.doc(`gameResults/${resultIdFor(pin, room!)}`).set(doc);
       summary.archived++;
     }
     await Promise.all([db.ref(`games/${pin}`).remove(), fs.doc(`liveGames/${pin}`).delete()]);

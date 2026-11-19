@@ -19,7 +19,7 @@ import {
   planStart,
   type OpContext,
 } from "../core/ops";
-import { buildGameResult } from "../core/archive";
+import { buildGameResult, resultIdFor } from "../core/archive";
 import { requireAllowedHost } from "./hostAuth";
 import {
   acquireLock,
@@ -105,6 +105,8 @@ async function transition(
   auth: AuthLike | undefined,
   data: unknown,
   spec: TransitionSpec,
+  /** runs after the result is computed and before it is written (may extend the patch) */
+  beforeWrite?: (pin: string, room: Room, patch: Patch, now: number) => Promise<void>,
 ): Promise<{ pin: string; room: Room; patch: Patch; now: number }> {
   const pin = parsePin(data);
   const [uid, quiz, head] = await Promise.all([
@@ -125,6 +127,7 @@ async function transition(
     const room: Room = { ...head, ...parts, state };
     const now = Date.now();
     const patch = spec.plan(room, ctx(now));
+    await beforeWrite?.(pin, room, patch, now);
     await writePatch(pin, patch);
     return { pin, room, patch, now };
   } catch (e) {
@@ -154,11 +157,17 @@ export async function nextQuestion(auth: AuthLike | undefined, data: unknown): R
 }
 
 export async function endGame(auth: AuthLike | undefined, data: unknown): Res<"endGame"> {
-  const { pin, room, patch, now } = await transition(auth, data, SPECS.end);
-  const fs = await firestore();
-  const ref = await fs.collection("gameResults").add(buildGameResult(applyPatch(room, patch), { pin, now }));
-  await fs.doc(`liveGames/${pin}`).delete();
-  return { ok: true, resultId: ref.id };
+  let resultId = "";
+  const { pin } = await transition(auth, data, SPECS.end, async (pin, room, patch, now) => {
+    // Archive BEFORE flipping to "ended": if we crash in between, the room stays locked (stale after
+    // 30 s) in its old phase, and a retry or the cleanup job rewrites the same doc id — no duplicates.
+    resultId = resultIdFor(pin, room);
+    const doc = buildGameResult(applyPatch(room, patch), { pin, now, retentionDays: club.game.resultsRetentionDays });
+    await (await firestore()).doc(`gameResults/${resultId}`).set(doc);
+    patch["meta/archived"] = true;
+  });
+  await (await firestore()).doc(`liveGames/${pin}`).delete();
+  return { ok: true, resultId };
 }
 
 export async function kickPlayer(auth: AuthLike | undefined, data: unknown): Res<"kickPlayer"> {

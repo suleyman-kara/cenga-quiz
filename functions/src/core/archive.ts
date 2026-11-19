@@ -28,8 +28,15 @@ export function hasScores(room: Room): boolean {
   return Object.keys(room.scores ?? {}).length > 0;
 }
 
+const DAY_MS = 86_400_000;
+
+/** Deterministic gameResults doc id: retries and cleanup overwrite instead of duplicating. */
+export function resultIdFor(pin: string, room: Pick<Room, "meta">): string {
+  return `${pin}_${room.meta?.createdAt ?? 0}`;
+}
+
 /** Firestore gameResults/{id} document for a finished (or abandoned) room. */
-export function buildGameResult(room: Room, opts: { pin: string; now: number }): GameResultDoc {
+export function buildGameResult(room: Room, opts: { pin: string; now: number; retentionDays: number }): GameResultDoc {
   const meta = room.meta;
   return {
     pin: opts.pin,
@@ -40,6 +47,7 @@ export function buildGameResult(room: Room, opts: { pin: string; now: number }):
     endedAt: opts.now,
     playerCount: Object.keys(room.players ?? {}).length,
     questionCount: meta?.questionCount ?? 0,
+    expireAt: new Date(opts.now + opts.retentionDays * DAY_MS),
     results: rankedResults(room),
   };
 }

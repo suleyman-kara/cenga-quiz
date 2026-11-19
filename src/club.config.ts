@@ -90,6 +90,8 @@ export interface ClubConfig {
     maxPlayers: number;
     /** Bu kadar saat hareketsiz kalan odalar zamanlanmış görevle kapatılır */
     abandonedAfterHours: number;
+    /** Oyun sonuçları (gameResults) bu kadar gün sonra Firestore TTL ile silinir (expireAt alanı) */
+    resultsRetentionDays: number;
   };
 }
 
@@ -184,5 +186,6 @@ export const club: ClubConfig = {
     leaderboardSize: 5,
     maxPlayers: 300,
     abandonedAfterHours: 6,
+    resultsRetentionDays: 365,
   },
 };

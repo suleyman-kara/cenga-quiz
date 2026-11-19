@@ -21,7 +21,7 @@
  * allowedHosts/{email}    { addedAt }             (admin/console/script only; user may read own)
  * quizzes/{quizId}        QuizDoc                 (owner only; contains correct answers)
  * liveGames/{pin}         LiveGameDoc             (Functions only — private quiz snapshot)
- * gameResults/{gameId}    GameResultDoc           (Functions write; host owner reads)
+ * gameResults/{pin}_{meta.createdAt}  GameResultDoc  (Functions write, idempotent set(); host owner reads)
  */
 
 export type Phase = "lobby" | "question" | "reveal" | "leaderboard" | "ended";
@@ -67,6 +67,11 @@ export interface GameResultDoc {
   endedAt: number;
   playerCount: number;
   questionCount: number;
+  /**
+   * Deletion time for the Firestore TTL policy (endedAt + club.game.resultsRetentionDays).
+   * Written as a Date; read back by the client SDK as a Firestore Timestamp.
+   */
+  expireAt: Date | { seconds: number; nanoseconds: number; toMillis(): number };
   /** sorted by rank */
   results: { uid: string; name: string; score: number; rank: number; correctCount: number }[];
 }
@@ -78,6 +83,10 @@ export interface GameMeta {
   title: string;
   createdAt: number;
   questionCount: number;
+  /** host closed the lobby: new joins are rejected (rules) */
+  locked?: boolean;
+  /** set once the result is safely in Firestore gameResults/{pin}_{createdAt} */
+  archived?: boolean;
 }
 
 /** Host action currently holding the state lock (see GameState.lock). */

@@ -14,7 +14,11 @@ export function classifyRoom(room: Room | null | undefined, now: number, opts: C
   if (!room?.meta && !room?.state) return "remove";
   const lastActivity = room.state?.updatedAt ?? room.meta?.createdAt ?? 0;
   const idle = now - lastActivity;
-  if (room.state?.phase === "ended") return idle > opts.endedGraceMs ? "remove" : "keep";
-  if (idle > opts.abandonedMs) return hasScores(room) ? "archive-remove" : "remove";
+  const archived = room.meta?.archived === true;
+  if (room.state?.phase === "ended") {
+    if (idle <= opts.endedGraceMs) return "keep";
+    return archived || !room.meta ? "remove" : "archive-remove";
+  }
+  if (idle > opts.abandonedMs) return hasScores(room) && !archived ? "archive-remove" : "remove";
   return "keep";
 }
