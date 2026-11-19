@@ -136,12 +136,37 @@ export function answersFor(room: Room, qIndex: number): Record<string, AnswerEnt
   return all?.[qIndex] ?? {};
 }
 
+function isFullEntry(p: unknown): p is PlayerEntry {
+  return isObj(p) && typeof p.name === "string" && typeof p.joinedAt === "number";
+}
+
+/**
+ * The players that count: full entries ({ name, joinedAt }) whose uid is not banned. A banned
+ * uid or a partial entry (left behind by an older racing write) is never scored or listed.
+ */
+export function activePlayers(room: Room): Record<string, PlayerEntry> {
+  const out: Record<string, PlayerEntry> = {};
+  for (const [uid, p] of Object.entries(room.players ?? {})) {
+    if (room.banned?.[uid] || !isFullEntry(p)) continue;
+    out[uid] = p;
+  }
+  return out;
+}
+
+/** Patch that deletes players entries that do not count (banned uid or partial entry). */
+export function purgeInactivePlayers(room: Room): Patch {
+  const active = activePlayers(room);
+  const patch: Patch = {};
+  for (const uid of Object.keys(room.players ?? {})) if (!active[uid]) patch[`players/${uid}`] = null;
+  return patch;
+}
+
 /** Reveal is allowed when time is up or every joined player answered the current question. */
 export function canReveal(room: Room, now: number): boolean {
   const state = room.state;
   if (!state) return false;
   if (now >= state.endsAt) return true;
   const answers = answersFor(room, state.qIndex);
-  const uids = Object.keys(room.players ?? {});
+  const uids = Object.keys(activePlayers(room));
   return uids.length > 0 && uids.every((uid) => answers[uid] !== undefined);
 }

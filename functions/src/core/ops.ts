@@ -6,7 +6,16 @@ import type { GameState, Phase, Quiz } from "../../../shared/types";
 import { scoreQuestion } from "../../../shared/scoring";
 import { GameError } from "./errors";
 import { assertTransition, type GameAction } from "./transitions";
-import { answersFor, canReveal, questionPatch, type GameConfig, type Patch, type Room } from "./room";
+import {
+  activePlayers,
+  answersFor,
+  canReveal,
+  purgeInactivePlayers,
+  questionPatch,
+  type GameConfig,
+  type Patch,
+  type Room,
+} from "./room";
 import { leaderboardFrom, rankedResults } from "./archive";
 import { joinOrder, sanitizePlayerNames } from "./sanitize";
 
@@ -47,17 +56,20 @@ function idleState(phase: Phase, qIndex: number, now: number): GameState {
 export function planStart(room: Room | null | undefined, ctx: OpContext): Patch {
   const r = guard(room, ctx, "start");
   const quiz = needQuiz(ctx);
-  const players = r.players ?? {};
+  // Banned uids / partial entries never count and are dropped.
+  const players = activePlayers(r);
   const order = joinOrder(players);
   if (order.length < 1) throw new GameError("failed-precondition", "Başlatmak için en az bir oyuncu gerekli.");
-  const patch: Patch = {};
+  const patch: Patch = purgeInactivePlayers(r);
   // Over capacity: keep the earliest joiners rather than failing the start.
   const kept = order.slice(0, Math.max(0, ctx.config.maxPlayers));
   for (const uid of order.slice(kept.length)) patch[`players/${uid}`] = null;
   // Final display names: blocked → neutral generated name, duplicates suffixed.
   const keptPlayers = Object.fromEntries(kept.map((uid) => [uid, players[uid]]));
+  // Whole objects, never `players/{uid}/name`: a child path would re-create a removed player
+  // as a partial entry. Only uids read (under the lock) as active players are written.
   for (const [uid, name] of Object.entries(sanitizePlayerNames(keptPlayers, ctx.namePrefix ?? "Oyuncu"))) {
-    patch[`players/${uid}/name`] = name;
+    patch[`players/${uid}`] = { name, joinedAt: players[uid].joinedAt };
   }
   return { ...patch, ...questionPatch(quiz, 0, ctx.now, ctx.config.defaultQuestionSeconds, ctx.config.leadInMs) };
 }
@@ -73,7 +85,7 @@ export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch
   }
   const { config } = ctx;
   const result = scoreQuestion({
-    players: r.players ?? {},
+    players: activePlayers(r),
     answers: answersFor(r, qIndex),
     correct: q.correct,
     optionCount: q.options.length,
@@ -84,6 +96,7 @@ export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch
     leaderboardSize: config.leaderboardSize,
   });
   return {
+    ...purgeInactivePlayers(r),
     reveal: { qIndex, correct: q.correct, counts: result.counts },
     scores: result.scores,
     leaderboard: result.leaderboard,
@@ -113,15 +126,21 @@ export function planEnd(room: Room | null | undefined, ctx: OpContext): Patch {
 
 /** Removes a player (and their score) and bans their uid from rejoining. */
 export function planKick(room: Room | null | undefined, ctx: OpContext, target: string): Patch {
+  return planKickMany(room, ctx, [target]);
+}
+
+/** Removes players (and their scores) and bans their uids, in one patch. */
+export function planKickMany(room: Room | null | undefined, ctx: OpContext, targets: readonly string[]): Patch {
   const r = guard(room, ctx, "kick");
-  const patch: Patch = { [`players/${target}`]: null, [`scores/${target}`]: null, [`banned/${target}`]: true };
+  const patch: Patch = {};
+  for (const t of targets) Object.assign(patch, { [`players/${t}`]: null, [`scores/${t}`]: null, [`banned/${t}`]: true });
   if (r.leaderboard) {
-    // Keep the big screen clean: rebuild the leaderboard (and ranks) without the kicked player.
-    const players = { ...(r.players ?? {}) };
-    delete players[target];
+    // Keep the big screen clean: rebuild the leaderboard (and ranks) without the kicked players.
+    const banned: Record<string, true> = { ...(r.banned ?? {}) };
+    for (const t of targets) banned[t] = true;
     const scores = { ...(r.scores ?? {}) };
-    delete scores[target];
-    const rows = rankedResults({ ...r, players, scores });
+    for (const t of targets) delete scores[t];
+    const rows = rankedResults({ ...r, banned, scores });
     for (const row of rows) {
       if (scores[row.uid] && scores[row.uid].rank !== row.rank) patch[`scores/${row.uid}/rank`] = row.rank;
     }

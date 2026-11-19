@@ -1,14 +1,14 @@
 import type { GameResultDoc, Leaderboard, PlayerScore } from "../../../shared/types";
 import { emptyScore, rankScores } from "../../../shared/scoring";
-import type { Room } from "./room";
+import { activePlayers, type Room } from "./room";
 
 export type ResultRow = GameResultDoc["results"][number];
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** Every joined player with their final score, sorted by rank (ties: name, then uid). */
+/** Every active player (see activePlayers) with their final score, sorted by rank (ties: name, then uid). */
 export function rankedResults(room: Room): ResultRow[] {
-  const players = room.players ?? {};
+  const players = activePlayers(room);
   const scores: Record<string, PlayerScore> = {};
   for (const uid of Object.keys(players)) scores[uid] = { ...emptyScore(), ...(room.scores?.[uid] ?? {}) };
   const ranked = rankScores(scores, players);
@@ -45,7 +45,7 @@ export function buildGameResult(room: Room, opts: { pin: string; now: number; re
     title: meta?.title ?? "",
     createdAt: meta?.createdAt ?? 0,
     endedAt: opts.now,
-    playerCount: Object.keys(room.players ?? {}).length,
+    playerCount: Object.keys(activePlayers(room)).length,
     questionCount: meta?.questionCount ?? 0,
     expireAt: new Date(opts.now + opts.retentionDays * DAY_MS),
     results: rankedResults(room),

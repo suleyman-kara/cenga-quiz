@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId, parseUid, parseBool, parseQIndex, parseHostAction } from "./auth";
+import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId, parseUid, parseUids, parseBool, parseQIndex, parseHostAction } from "./auth";
 import { GameError } from "./errors";
 
 function code(fn: () => unknown): string | undefined {
@@ -96,4 +96,16 @@ describe("parseHostAction", () => {
     "rejects %j",
     (d) => expect(code(() => parseHostAction(d))).toBe("invalid-argument"),
   );
+});
+
+describe("parseUids", () => {
+  it("accepts 1..100 uids and drops duplicates", () => {
+    expect(parseUids({ uids: ["a", "b", "a"] })).toEqual(["a", "b"]);
+    expect(parseUids({ uids: Array.from({ length: 100 }, (_, i) => `u${i}`) })).toHaveLength(100);
+  });
+  it("rejects empty, too many, non-arrays and bad uids", () => {
+    for (const uids of [[], Array.from({ length: 101 }, (_, i) => `u${i}`), "a", undefined, ["a/b"], [1]]) {
+      expect(() => parseUids({ uids })).toThrow(expect.objectContaining({ code: "invalid-argument" }));
+    }
+  });
 });

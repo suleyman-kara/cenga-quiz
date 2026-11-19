@@ -44,13 +44,29 @@ export function parseQuizId(data: unknown): string {
   return id;
 }
 
+const UID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+
 /** A Firebase Auth uid usable as an RTDB key. */
 export function parseUid(data: unknown): string {
   const uid = field(data, "uid");
-  if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) {
+  if (typeof uid !== "string" || !UID_RE.test(uid)) {
     throw new GameError("invalid-argument", "Geçersiz oyuncu kimliği.");
   }
   return uid;
+}
+
+export const MAX_KICK_UIDS = 100;
+
+/** `uids`: 1..MAX_KICK_UIDS valid uids (duplicates dropped). */
+export function parseUids(data: unknown): string[] {
+  const uids = field(data, "uids");
+  if (!Array.isArray(uids) || uids.length < 1 || uids.length > MAX_KICK_UIDS) {
+    throw new GameError("invalid-argument", `1 ile ${MAX_KICK_UIDS} arasında oyuncu kimliği gönderin.`);
+  }
+  if (!uids.every((u) => typeof u === "string" && UID_RE.test(u))) {
+    throw new GameError("invalid-argument", "Geçersiz oyuncu kimliği.");
+  }
+  return [...new Set(uids as string[])];
 }
 
 export function parseBool(data: unknown, key: string): boolean {

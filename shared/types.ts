@@ -90,7 +90,7 @@ export interface GameMeta {
 }
 
 /** Host action currently holding the state lock (see GameState.lock). */
-export type LockAction = "start" | "reveal" | "showLeaderboard" | "next" | "end";
+export type LockAction = "start" | "reveal" | "showLeaderboard" | "next" | "end" | "kick";
 
 /**
  * Server-only transition lock. While present (and fresher than ~30 s) the room's inputs are
@@ -179,6 +179,10 @@ export interface Leaderboard {
  * (for nextQuestion: the question being left). If the room already moved past that step the call
  * succeeds with `already: true` (duplicate click / retry); a qIndex ahead of the room →
  * failed-precondition. endGame on an ended room → `{ ok, already: true, resultId }`.
+ *
+ * kickPlayer / kickPlayers take the same state lock as the transitions. While another host step
+ * holds it they fail with failed-precondition "Başka bir işlem sürüyor, lütfen tekrar deneyin."
+ * — retry shortly. kickPlayers takes 1..100 uids.
  */
 export interface HostActionMap {
   createGame: { req: { quizId: string }; res: { pin: string } };
@@ -188,6 +192,7 @@ export interface HostActionMap {
   nextQuestion: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
   endGame: { req: { pin: string }; res: { ok: true; resultId: string; already?: true } };
   kickPlayer: { req: { pin: string; uid: string }; res: { ok: true } };
+  kickPlayers: { req: { pin: string; uids: string[] }; res: { ok: true } };
   setLobbyLocked: { req: { pin: string; locked: boolean }; res: { ok: true; locked: boolean } };
 }
 export type HostAction = keyof HostActionMap;
@@ -199,6 +204,7 @@ export const HOST_ACTIONS: readonly HostAction[] = [
   "nextQuestion",
   "endGame",
   "kickPlayer",
+  "kickPlayers",
   "setLobbyLocked",
 ];
 export type HostRequest<A extends HostAction = HostAction> = A extends HostAction

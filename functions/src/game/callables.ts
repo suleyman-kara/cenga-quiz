@@ -2,9 +2,8 @@ import type { GameMeta, HostAction, HostActionMap, LiveGameDoc, LockAction, Quiz
 import { validateQuiz } from "../../../shared/quizValidate";
 import { club } from "../../../src/club.config";
 import type { AuthLike } from "../core/auth";
-import { parseBool, parseHostAction, parsePin, parseQIndex, parseQuizId, parseUid } from "../core/auth";
+import { parseBool, parseHostAction, parsePin, parseQIndex, parseQuizId, parseUid, parseUids } from "../core/auth";
 import { stepStatus } from "../core/transitions";
-import { busyError, isLockActive } from "../core/lock";
 import { GameError } from "../core/errors";
 import { allocatePin, securePin } from "../core/pin";
 import { applyPatch, newRoom, type GameConfig, type Patch, type Room } from "../core/room";
@@ -12,7 +11,7 @@ import {
   assertHost,
   guard,
   planEnd,
-  planKick,
+  planKickMany,
   planNext,
   planReveal,
   planSetLobbyLocked,
@@ -92,12 +91,12 @@ interface TransitionSpec {
 class AlreadyDone extends Error {}
 
 const SPECS = {
-  start: { action: "start", plan: planStart, needsQuiz: true, parts: ["players"], precheck: true },
+  start: { action: "start", plan: planStart, needsQuiz: true, parts: ["players", "banned"], precheck: true },
   reveal: {
     action: "reveal",
     plan: planReveal,
     needsQuiz: true,
-    parts: ["players", "answers", "scores"],
+    parts: ["players", "answers", "scores", "banned"],
     precheck: true,
     step: true,
   },
@@ -110,8 +109,14 @@ const SPECS = {
     step: true,
   },
   next: { action: "next", plan: planNext, needsQuiz: true, parts: [], precheck: false, step: true },
-  end: { action: "end", plan: planEnd, needsQuiz: false, parts: ["players", "scores", "leaderboard"], precheck: false },
-} satisfies Record<LockAction, TransitionSpec>;
+  end: {
+    action: "end",
+    plan: planEnd,
+    needsQuiz: false,
+    parts: ["players", "scores", "leaderboard", "banned"],
+    precheck: false,
+  },
+} satisfies Record<Exclude<LockAction, "kick">, TransitionSpec>;
 
 /**
  * Host transition without a room-wide transaction:
@@ -202,16 +207,34 @@ export async function endGame(auth: AuthLike | undefined, data: unknown): Res<"e
   return { ok: true, resultId };
 }
 
-export async function kickPlayer(auth: AuthLike | undefined, data: unknown): Res<"kickPlayer"> {
-  const pin = parsePin(data);
-  const target = parseUid(data);
+/**
+ * Kicks run under the same state lock as the transitions, so a kick can never interleave with a
+ * reveal/start that already read the players (ghost scores, re-created banned entries). While
+ * another step holds the lock this fails with the retryable busy error.
+ */
+async function kick(auth: AuthLike | undefined, pin: string, targets: string[]): Promise<void> {
   const [uid, head] = await Promise.all([requireAllowedHost(auth), readHead(pin)]);
-  const ctx: OpContext = { uid, now: Date.now(), config: gameConfig };
-  planKick(head, ctx, target); // host / phase checks before reading more
-  // A transition is computing scores from the current players: don't race it.
-  if (isLockActive(head.state?.lock, ctx.now)) throw busyError();
-  const parts = await readParts(pin, ["players", "scores", "leaderboard"], undefined);
-  await updateRoom(pin, planKick({ ...head, ...parts }, ctx, target));
+  const ctx = (now: number): OpContext => ({ uid, now, config: gameConfig });
+  planKickMany(head, ctx(Date.now()), targets); // host / phase checks before taking the lock
+  const { state, lock } = await acquireLock(pin, "kick", (current, now) => {
+    guard({ meta: head.meta, state: current }, ctx(now), "kick");
+  });
+  try {
+    const parts = await readParts(pin, ["players", "scores", "leaderboard", "banned"], undefined);
+    await writePatch(pin, planKickMany({ ...head, ...parts, state }, ctx(Date.now()), targets));
+  } catch (e) {
+    await releaseLock(pin, lock).catch(() => undefined);
+    throw e;
+  }
+}
+
+export async function kickPlayer(auth: AuthLike | undefined, data: unknown): Res<"kickPlayer"> {
+  await kick(auth, parsePin(data), [parseUid(data)]);
+  return { ok: true };
+}
+
+export async function kickPlayers(auth: AuthLike | undefined, data: unknown): Res<"kickPlayers"> {
+  await kick(auth, parsePin(data), parseUids(data));
   return { ok: true };
 }
 
@@ -233,6 +256,7 @@ const HANDLERS: { [A in HostAction]: Handler<A> } = {
   nextQuestion,
   endGame,
   kickPlayer,
+  kickPlayers,
   setLobbyLocked,
 };
 

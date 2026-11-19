@@ -295,6 +295,12 @@ describe("RTDB: answers", () => {
     await seed({ phase: "question", qIndex: 0 });
     await assertSucceeds(answer(P1, 0, 2));
   });
+  it("rejects answers from a banned uid even if a (partial) players entry is left behind", async () => {
+    await seed({ phase: "question", qIndex: 0 });
+    await owner().ref(`${G}/banned/${P2}`).set(true);
+    await assertFails(answer(P2, 0, 1));
+    await assertSucceeds(answer(P1, 0, 1));
+  });
   it("allows answering when qIndex > 0", async () => {
     await seed({ phase: "question", qIndex: 2 });
     await assertSucceeds(answer(P1, 2, 0));

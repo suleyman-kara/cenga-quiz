@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { planStart, planReveal, planShowLeaderboard, planNext, planEnd, planKick, planSetLobbyLocked } from "./ops";
+import {
+  planStart,
+  planReveal,
+  planShowLeaderboard,
+  planNext,
+  planEnd,
+  planKick,
+  planKickMany,
+  planSetLobbyLocked,
+} from "./ops";
 import { applyPatch, type Room } from "./room";
 import { GameError } from "./errors";
 import { config, lobbyRoom, quiz } from "./fixtures";
@@ -41,16 +50,15 @@ describe("planStart", () => {
     const r = lobbyRoom({ p1: "Ali", p2: "ali", p3: "orospu" });
     r.players!.p2.joinedAt = 1600;
     const patch = planStart(r, { ...host, now: 1 });
-    expect(patch["players/p2/name"]).toBe("ali (2)");
-    expect(patch["players/p3/name"]).toBe("Oyuncu 1");
-    expect(patch["players/p1/name"]).toBeUndefined();
+    expect(patch["players/p2"]).toEqual({ name: "ali (2)", joinedAt: 1600 });
+    expect(patch["players/p3"]).toEqual({ name: "Oyuncu 1", joinedAt: 1500 });
+    expect(patch["players/p1"]).toBeUndefined();
   });
   it("does not rename players removed for capacity", () => {
     const r = lobbyRoom({ a: "A", b: "B", c: "C", d: "orospu" });
     r.players!.d.joinedAt = 9999;
     const patch = planStart(r, { ...host, now: 1 });
     expect(patch["players/d"]).toBeNull();
-    expect(patch["players/d/name"]).toBeUndefined();
   });
   it("applies the configured lead-in to start and next", () => {
     const lead = { ...host, config: { ...config, leadInMs: 3000 } };
@@ -224,5 +232,86 @@ describe("planSetLobbyLocked", () => {
     expect(errCode(() => planSetLobbyLocked(lobbyRoom(), { ...host, uid: "x", now: 1 }, true))).toBe("permission-denied");
     const ended = applyPatch(lobbyRoom(), { "state/phase": "ended" });
     expect(errCode(() => planSetLobbyLocked(ended, { ...host, now: 1 }, true))).toBe("failed-precondition");
+  });
+});
+
+describe("banned uids and partial player entries (kick races)", () => {
+  /** p3 was kicked (banned) but a racing write left a partial players/p3 = { name } behind. */
+  function withGhost(r: Room): Room {
+    return applyPatch(r, { "players/p3": { name: "Hayalet" }, "banned/p3": true, "players/p4": { name: "Yarım" } }) as Room;
+  }
+
+  it("planStart writes full player objects, never bare name paths, and drops banned/partial entries", () => {
+    const r = withGhost(lobbyRoom({ p1: "Ali", p2: "ali" }));
+    const patch = planStart(r, { ...host, now: 1 });
+    for (const key of Object.keys(patch)) expect(key).not.toMatch(/^players\/[^/]+\/name$/);
+    expect(patch["players/p2"]).toEqual({ name: "ali (2)", joinedAt: 1500 });
+    expect(patch["players/p3"]).toBeNull();
+    expect(patch["players/p4"]).toBeNull();
+    const out = applyPatch(r, patch) as Room;
+    expect(Object.keys(out.players!).sort()).toEqual(["p1", "p2"]);
+  });
+
+  it("planStart does not count banned/partial entries as players", () => {
+    const r = withGhost(lobbyRoom({}));
+    expect(errCode(() => planStart(r, { ...host, now: 1 }))).toBe("failed-precondition");
+  });
+
+  it("planReveal never scores a banned uid or a partial entry and drops them", () => {
+    let r = started(10_000);
+    r = withGhost(
+      applyPatch(r, {
+        "answers/0/p1": { choice: 2, at: 11_000 },
+        "answers/0/p2": { choice: 2, at: 11_000 },
+        "answers/0/p3": { choice: 2, at: 10_100 },
+        "scores/p3": { score: 5000, streak: 1, rank: 1, lastDelta: 0, lastCorrect: true, lastAnswered: true, correctCount: 1 },
+      }) as Room,
+    );
+    // everyone *active* answered → early reveal allowed even though p4 (partial) did not
+    const patch = planReveal(r, { ...host, now: 12_000 });
+    const out = applyPatch(r, patch) as Room;
+    expect(Object.keys(out.scores!).sort()).toEqual(["p1", "p2"]);
+    expect(out.leaderboard?.playerCount).toBe(2);
+    expect(out.leaderboard?.top.map((e) => e.name)).not.toContain("Hayalet");
+    expect(out.reveal?.counts).toEqual([0, 0, 2, 0]);
+    expect(patch["players/p3"]).toBeNull();
+    expect(patch["players/p4"]).toBeNull();
+  });
+
+  it("planEnd's leaderboard ignores banned and partial entries", () => {
+    const r = withGhost(lobbyRoom());
+    const out = applyPatch(r, planEnd(r, { ...host, now: 2 })) as Room;
+    expect(out.leaderboard?.playerCount).toBe(2);
+    expect(out.leaderboard?.top.map((e) => e.name).sort()).toEqual(["Ali", "Ayşe"]);
+  });
+});
+
+describe("planKickMany", () => {
+  it("removes, unscores and bans every target in one patch", () => {
+    const r = applyPatch(revealed(), { "players/p5": { name: "Can", joinedAt: 1600 } }) as Room;
+    const patch = planKickMany(r, { ...host, now: 1 }, ["p1", "p5"]);
+    expect(patch).toMatchObject({
+      "players/p1": null,
+      "scores/p1": null,
+      "banned/p1": true,
+      "players/p5": null,
+      "scores/p5": null,
+      "banned/p5": true,
+    });
+    const out = applyPatch(r, patch) as Room;
+    expect(Object.keys(out.players!)).toEqual(["p2"]);
+    expect(out.leaderboard).toEqual({ top: [{ name: "Ayşe", score: 0, rank: 1 }], playerCount: 1 });
+    expect(out.scores?.p2.rank).toBe(1);
+  });
+  it("leaderboard rebuild ignores previously banned uids still present in scores", () => {
+    const r = applyPatch(revealed(), { "banned/p1": true }) as Room;
+    const out = applyPatch(r, planKickMany(r, { ...host, now: 1 }, ["p2"])) as Room;
+    expect(out.leaderboard).toEqual({ top: [], playerCount: 0 });
+  });
+  it("planKick is planKickMany with one uid", () => {
+    expect(planKick(lobbyRoom(), { ...host, now: 1 }, "p1")).toEqual(planKickMany(lobbyRoom(), { ...host, now: 1 }, ["p1"]));
+  });
+  it("host only, not after the game ended", () => {
+    expect(errCode(() => planKickMany(lobbyRoom(), { ...host, uid: "x", now: 1 }, ["p1"]))).toBe("permission-denied");
   });
 });

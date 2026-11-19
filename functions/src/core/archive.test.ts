@@ -44,6 +44,19 @@ describe("buildGameResult", () => {
     expect(doc.results).toEqual([]);
     expect(doc.playerCount).toBe(0);
   });
+
+  it("leaves out banned uids and partial player entries (kick races)", () => {
+    const room = {
+      ...lobbyRoom({ p1: "Ali" }),
+      scores: { p1: s(100, 1), p2: s(900, 3) },
+      banned: { p2: true },
+    } as Room;
+    room.players!.p2 = { name: "Hayalet", joinedAt: 1 };
+    (room.players as Record<string, unknown>).p3 = { name: "Yarım" };
+    const doc = buildGameResult(room, { pin: "123456", now: 1, retentionDays: 1 });
+    expect(doc.playerCount).toBe(1);
+    expect(doc.results.map((r) => r.uid)).toEqual(["p1"]);
+  });
 });
 
 describe("hasScores", () => {
