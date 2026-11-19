@@ -1,11 +1,30 @@
 /** Lazy Admin SDK handles: nothing heavy is loaded until a function actually needs it. */
-import { getApps, initializeApp, type App } from "firebase-admin/app";
+import { getApps, initializeApp, type App, type AppOptions } from "firebase-admin/app";
+import { defineString } from "firebase-functions/params";
+
+/**
+ * Realtime Database URL for a real project, e.g.
+ * https://<project>-default-rtdb.europe-west1.firebasedatabase.app (regional instances are not
+ * in the default FIREBASE_CONFIG). Empty → default config (emulator / us-central1 instance).
+ */
+export const DATABASE_URL = defineString("DATABASE_URL", {
+  default: "",
+  description: "RTDB URL, e.g. https://<project>-default-rtdb.europe-west1.firebasedatabase.app",
+});
+
+export function appOptions(databaseUrl: string): AppOptions | undefined {
+  const url = databaseUrl.trim();
+  return url ? { databaseURL: url } : undefined;
+}
 import type { Database } from "firebase-admin/database";
 import type { Firestore } from "firebase-admin/firestore";
 
 function app(): App {
   // In the emulator / on Cloud Functions FIREBASE_CONFIG supplies projectId + databaseURL.
-  return getApps().find((a) => a.name === "[DEFAULT]") ?? initializeApp();
+  const existing = getApps().find((a) => a.name === "[DEFAULT]");
+  if (existing) return existing;
+  const opts = appOptions(DATABASE_URL.value());
+  return opts ? initializeApp(opts) : initializeApp();
 }
 
 /**
