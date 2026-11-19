@@ -109,6 +109,8 @@ export const tr: Messages = {
   "hostGame.kick": "{name} adlı oyuncuyu çıkar",
   "hostGame.kickConfirm": "{name} oyundan çıkarılsın mı? Bu cihaz oyuna geri giremez.",
   "hostGame.kickConfirmOk": "Çıkar",
+  "hostGame.maskedName": "Oyuncu {n}",
+  "hostGame.duplicateName": "Aynı ad",
   "common.cancel": "Vazgeç",
   "hostGame.lockLobby": "Lobiyi kilitle",
   "hostGame.unlockLobby": "Lobi kilidini aç",

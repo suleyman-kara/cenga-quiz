@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { LeaderboardEntry } from "../../shared/types";
 import { t } from "../i18n";
+import { displayName } from "../host/displayNames";
 
 interface Props {
   entries: LeaderboardEntry[];
@@ -21,7 +22,7 @@ export function Leaderboard({ entries, limit = 5 }: Props) {
           style={{ "--i": i, "--share": Math.max(0, e.score) / top } as CSSProperties}
         >
           <span className="leaderboard__rank">{e.rank}</span>
-          <span className="leaderboard__name">{e.name}</span>
+          <span className="leaderboard__name">{displayName(e.name, i + 1).label}</span>
           <span className="leaderboard__score">{e.score}</span>
         </li>
       ))}

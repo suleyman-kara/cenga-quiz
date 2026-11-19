@@ -266,6 +266,35 @@
   color: var(--c-on);
 }
 
+/* display-masked (blocked) names and case-insensitive duplicates */
+.player-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+li[data-masked] .player-label {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.dup-badge {
+  font-size: 0.7em;
+  font-weight: 700;
+  font-style: normal;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-warning, #e8a33d);
+  color: #1b1b1b;
+  white-space: nowrap;
+}
+
+li[data-duplicate] {
+  outline: 2px dashed var(--color-warning, #e8a33d);
+  outline-offset: 2px;
+}
+
 @keyframes name-in {
   from {
     transform: translateY(10px) scale(0.5);

@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { LeaderboardEntry } from "../../shared/types";
 import { club } from "../club.config";
 import { t } from "../i18n";
+import { displayName } from "../host/displayNames";
 import { ChoiceShape } from "./ChoiceShape";
 
 /** Deterministic pseudo-random in [0,1) so confetti looks scattered but renders the same every time. */
@@ -56,7 +57,7 @@ export function Podium({ entries }: { entries: LeaderboardEntry[] }) {
         {top.map((e, i) => (
           <li key={`${e.rank}-${e.name}-${i}`} className={`podium__step podium__step--${i + 1}`}>
             <span className="podium__who">
-              <span className="podium__name">{e.name}</span>
+              <span className="podium__name">{displayName(e.name, i + 1).label}</span>
               <span className="podium__score">{e.score}</span>
             </span>
             <span className="podium__block" aria-label={t("podium.place", { rank: e.rank })}>

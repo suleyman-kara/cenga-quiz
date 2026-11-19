@@ -83,6 +83,35 @@ describe("HostGame", () => {
     expect(hostCall).toHaveBeenCalledWith("startGame", { pin: "123456" });
   });
 
+  it("lobby: a blocked nickname is masked on the projector (data untouched), duplicates are marked", async () => {
+    vi.mocked(hooks.usePlayers).mockReturnValue([
+      { uid: "u0", name: "Ali", joinedAt: 0 },
+      { uid: "u1", name: "amk", joinedAt: 1 },
+      { uid: "u2", name: "ALİ", joinedAt: 2 },
+    ]);
+    renderHost();
+    expect(screen.queryByText("amk")).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toMatch(/amk/i);
+    const masked = screen.getByText(t("hostGame.maskedName", { n: 2 }));
+    expect(masked.closest("li")).toHaveAttribute("data-masked", "true");
+    expect(screen.getByText("Ali").closest("li")).toHaveAttribute("data-duplicate", "true");
+    expect(screen.getByText("ALİ").closest("li")).toHaveAttribute("data-duplicate", "true");
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kick", { name: t("hostGame.maskedName", { n: 2 }) }) }));
+    expect(screen.getByRole("alertdialog")).not.toHaveTextContent(/amk/i);
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.kickConfirmOk") }));
+    expect(hostCall).toHaveBeenCalledWith("kickPlayer", { pin: "123456", uid: "u1" });
+  });
+
+  it("mid-game panel and leaderboard mask blocked names too", async () => {
+    vi.mocked(hooks.usePlayers).mockReturnValue([{ uid: "u0", name: "amk", joinedAt: 0 }]);
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "leaderboard" });
+    vi.mocked(hooks.useLeaderboard).mockReturnValue({ top: [{ name: "amk", score: 10, rank: 1 }], playerCount: 1 });
+    renderHost();
+    await userEvent.click(screen.getByText(t("hostGame.playersPanel", { count: 1 })));
+    expect(document.body.innerHTML).not.toMatch(/amk/i);
+    expect(screen.getAllByText(t("hostGame.maskedName", { n: 1 })).length).toBeGreaterThanOrEqual(2);
+  });
+
   it("lobby: Start is disabled without players", () => {
     vi.mocked(hooks.usePlayers).mockReturnValue([]);
     renderHost();

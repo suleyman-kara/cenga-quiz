@@ -10,10 +10,10 @@ import {
   useQuestion,
   useReveal,
   useServerNow,
-  type PlayerListItem,
 } from "../game/hooks";
 import { useConnectionLost } from "../game/connection";
 import { HostGate } from "../host/HostGate";
+import { displayPlayers, type DisplayPlayer } from "../host/displayNames";
 import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../host/useAutoReveal";
 import { useWakeLock } from "../host/useWakeLock";
 import { withRetry } from "../host/retry";
@@ -47,6 +47,8 @@ function BigScreen({ pin }: { pin: string }) {
   const reveal = useReveal(pin);
   const leaderboard = useLeaderboard(pin);
   const players = usePlayers(pin);
+  // display-only (masked / duplicate-marked) labels; actions always use the uid
+  const shown = displayPlayers(players);
   const qIndex = state?.qIndex ?? -1;
   const answerUids = useAnswerUids(pin, qIndex);
   const now = useServerNow();
@@ -75,8 +77,8 @@ function BigScreen({ pin }: { pin: string }) {
 
   // In-app confirmation: window.confirm would freeze timers and listeners while open, then let
   // the kick and a pending auto-reveal fire in the same tick.
-  const [kickTarget, setKickTarget] = useState<PlayerListItem | null>(null);
-  const kick = useCallback((p: PlayerListItem) => setKickTarget(p), []);
+  const [kickTarget, setKickTarget] = useState<DisplayPlayer | null>(null);
+  const kick = useCallback((p: DisplayPlayer) => setKickTarget(p), []);
   const confirmKick = () => {
     const p = kickTarget;
     setKickTarget(null);
@@ -116,7 +118,7 @@ function BigScreen({ pin }: { pin: string }) {
   else
     switch (state.phase) {
       case "lobby":
-        body = <LobbyStage pin={pin} meta={meta} players={players} onKick={kick} busy={busy} />;
+        body = <LobbyStage pin={pin} meta={meta} players={shown} onKick={kick} busy={busy} />;
         controls = (
           <>
             <button
@@ -273,14 +275,14 @@ function BigScreen({ pin }: { pin: string }) {
         )}
         {(controls || midGame) && (
           <div className="stage__controls">
-            {midGame && <PlayersPanel players={players} onKick={kick} busy={busy} />}
+            {midGame && <PlayersPanel players={shown} onKick={kick} busy={busy} />}
             {controls}
           </div>
         )}
       </div>
       <ConfirmDialog
         open={!!kickTarget}
-        message={kickTarget ? t("hostGame.kickConfirm", { name: kickTarget.name }) : ""}
+        message={kickTarget ? t("hostGame.kickConfirm", { name: kickTarget.label }) : ""}
         confirmLabel={t("hostGame.kickConfirmOk")}
         cancelLabel={t("common.cancel")}
         onConfirm={confirmKick}
@@ -299,8 +301,8 @@ function LobbyStage({
 }: {
   pin: string;
   meta: GameMeta | null | undefined;
-  players: PlayerListItem[];
-  onKick: (p: PlayerListItem) => void;
+  players: DisplayPlayer[];
+  onKick: (p: DisplayPlayer) => void;
   busy: boolean;
 }) {
   return (
@@ -345,9 +347,14 @@ function LobbyStage({
         ) : (
           <ul className="name-grid">
             {players.map((p, i) => (
-              <li key={p.uid} data-choice={i % club.choices.length}>
+              <li
+                key={p.uid}
+                data-choice={i % club.choices.length}
+                data-masked={p.masked || undefined}
+                data-duplicate={p.duplicate || undefined}
+              >
                 <ChoiceShape index={i % club.choices.length} />
-                <span>{p.name}</span>
+                <PlayerLabel player={p} />
                 <KickButton player={p} onKick={onKick} disabled={busy} />
               </li>
             ))}
@@ -358,21 +365,35 @@ function LobbyStage({
   );
 }
 
+/** Masked/duplicate-aware name; never renders the raw name of a masked player. */
+function PlayerLabel({ player }: { player: DisplayPlayer }) {
+  return (
+    <span className="player-label">
+      <span>{player.label}</span>
+      {player.duplicate && (
+        <span className="dup-badge" title={t("hostGame.duplicateName")}>
+          {t("hostGame.duplicateName")}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function KickButton({
   player,
   onKick,
   disabled,
 }: {
-  player: PlayerListItem;
-  onKick: (p: PlayerListItem) => void;
+  player: DisplayPlayer;
+  onKick: (p: DisplayPlayer) => void;
   disabled: boolean;
 }) {
   return (
     <button
       type="button"
       className="kick-btn"
-      aria-label={t("hostGame.kick", { name: player.name })}
-      title={t("hostGame.kick", { name: player.name })}
+      aria-label={t("hostGame.kick", { name: player.label })}
+      title={t("hostGame.kick", { name: player.label })}
       disabled={disabled}
       onClick={() => onKick(player)}
     >
@@ -389,8 +410,8 @@ function PlayersPanel({
   onKick,
   busy,
 }: {
-  players: PlayerListItem[];
-  onKick: (p: PlayerListItem) => void;
+  players: DisplayPlayer[];
+  onKick: (p: DisplayPlayer) => void;
   busy: boolean;
 }) {
   return (
@@ -398,8 +419,8 @@ function PlayersPanel({
       <summary>{t("hostGame.playersPanel", { count: players.length })}</summary>
       <ul className="stage-panel__list">
         {players.map((p) => (
-          <li key={p.uid}>
-            <span>{p.name}</span>
+          <li key={p.uid} data-masked={p.masked || undefined} data-duplicate={p.duplicate || undefined}>
+            <PlayerLabel player={p} />
             <KickButton player={p} onKick={onKick} disabled={busy} />
           </li>
         ))}

@@ -107,6 +107,8 @@ export const en = {
   "hostGame.kick": "Remove {name}",
   "hostGame.kickConfirm": "Remove {name} from the game? This device can't rejoin.",
   "hostGame.kickConfirmOk": "Remove",
+  "hostGame.maskedName": "Player {n}",
+  "hostGame.duplicateName": "Same name",
   "common.cancel": "Cancel",
   "hostGame.lockLobby": "Lock lobby",
   "hostGame.unlockLobby": "Unlock lobby",
