@@ -1,37 +1,38 @@
 import { setGlobalOptions } from "firebase-functions/options";
-import { onCall, HttpsError, type CallableRequest } from "firebase-functions/https";
+import { onCall, HttpsError } from "firebase-functions/https";
 import { onSchedule } from "firebase-functions/scheduler";
+import { defineBoolean, defineInt } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import { FUNCTIONS_REGION } from "../../shared/types";
 import { GameError } from "./core/errors";
-import * as game from "./game/callables";
+import { dispatchHost } from "./game/callables";
 import { runCleanup } from "./game/cleanup";
 
 setGlobalOptions({ region: FUNCTIONS_REGION, maxInstances: 10 });
 
-type Handler<R> = (auth: CallableRequest["auth"], data: unknown) => Promise<R>;
+/** Keep N instances warm during an event (e.g. 1), back to 0 afterwards. */
+const MIN_INSTANCES = defineInt("MIN_INSTANCES", {
+  default: 0,
+  description: "Warm instances for the host callable (set 1 during an event).",
+});
+/** Turn on once the web client initializes App Check (off by default so local/emulator works). */
+const ENFORCE_APP_CHECK = defineBoolean("ENFORCE_APP_CHECK", {
+  default: false,
+  description: "Reject host calls without a valid App Check token.",
+});
 
-function callable<R>(name: string, handler: Handler<R>) {
-  return onCall(async (req) => {
-    try {
-      return await handler(req.auth, req.data);
-    } catch (e) {
-      if (e instanceof GameError) throw new HttpsError(e.code, e.message);
-      if (e instanceof HttpsError) throw e;
-      logger.error(`${name} failed`, e);
-      throw new HttpsError("internal", "Beklenmeyen bir hata oluştu.");
-    }
-  });
-}
-
-export const createGame = callable("createGame", game.createGame);
-export const startGame = callable("startGame", game.startGame);
-export const reveal = callable("reveal", game.reveal);
-export const showLeaderboard = callable("showLeaderboard", game.showLeaderboard);
-export const nextQuestion = callable("nextQuestion", game.nextQuestion);
-export const endGame = callable("endGame", game.endGame);
-export const kickPlayer = callable("kickPlayer", game.kickPlayer);
-export const setLobbyLocked = callable("setLobbyLocked", game.setLobbyLocked);
+/** Single dispatcher for every host action, so one warm instance serves the whole event. */
+export const host = onCall({ minInstances: MIN_INSTANCES, enforceAppCheck: ENFORCE_APP_CHECK }, async (req) => {
+  try {
+    return (await dispatchHost(req.auth, req.data)).result;
+  } catch (e) {
+    if (e instanceof GameError) throw new HttpsError(e.code, e.message);
+    if (e instanceof HttpsError) throw e;
+    const action = (req.data as { action?: unknown } | null)?.action;
+    logger.error(`host(${String(action)}) failed`, e);
+    throw new HttpsError("internal", "Beklenmeyen bir hata oluştu.");
+  }
+});
 
 export const cleanupGames = onSchedule(
   { schedule: "every 30 minutes", timeZone: "Europe/Istanbul", region: FUNCTIONS_REGION },

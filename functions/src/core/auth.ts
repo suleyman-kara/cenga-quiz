@@ -1,4 +1,5 @@
 import { isValidPin } from "../../../shared/pin";
+import { HOST_ACTIONS, type HostAction } from "../../../shared/types";
 import { GameError } from "./errors";
 
 /** Minimal shape of a callable request's `auth`. */
@@ -65,4 +66,12 @@ export function parseQIndex(data: unknown): number {
     throw new GameError("invalid-argument", "Geçersiz soru sırası (qIndex).");
   }
   return q;
+}
+
+export function parseHostAction(data: unknown): HostAction {
+  const a = field(data, "action");
+  if (typeof a !== "string" || !(HOST_ACTIONS as readonly string[]).includes(a)) {
+    throw new GameError("invalid-argument", "Geçersiz işlem.");
+  }
+  return a as HostAction;
 }

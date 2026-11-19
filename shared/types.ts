@@ -167,7 +167,16 @@ export interface Leaderboard {
 }
 
 // ---------- Callable function contract (region europe-west1) ----------
-export interface CallableContract {
+/**
+ * Every host action goes through ONE callable, `host` (HOST_CALLABLE), so a single warm
+ * instance serves the whole event. Request: `{ action, ...HostActionMap[action]["req"] }`.
+ *
+ * reveal / showLeaderboard / nextQuestion carry `qIndex` = the question the host screen is on
+ * (for nextQuestion: the question being left). If the room already moved past that step the call
+ * succeeds with `already: true` (duplicate click / retry); a qIndex ahead of the room →
+ * failed-precondition. endGame on an ended room → `{ ok, already: true, resultId }`.
+ */
+export interface HostActionMap {
   createGame: { req: { quizId: string }; res: { pin: string } };
   startGame: { req: { pin: string }; res: { ok: true } };
   reveal: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
@@ -176,6 +185,27 @@ export interface CallableContract {
   endGame: { req: { pin: string }; res: { ok: true; resultId: string; already?: true } };
   kickPlayer: { req: { pin: string; uid: string }; res: { ok: true } };
   setLobbyLocked: { req: { pin: string; locked: boolean }; res: { ok: true; locked: boolean } };
+}
+export type HostAction = keyof HostActionMap;
+export const HOST_ACTIONS: readonly HostAction[] = [
+  "createGame",
+  "startGame",
+  "reveal",
+  "showLeaderboard",
+  "nextQuestion",
+  "endGame",
+  "kickPlayer",
+  "setLobbyLocked",
+];
+export type HostRequest<A extends HostAction = HostAction> = A extends HostAction
+  ? { action: A } & HostActionMap[A]["req"]
+  : never;
+export type HostResponse<A extends HostAction = HostAction> = HostActionMap[A]["res"];
+
+export const HOST_CALLABLE = "host";
+
+export interface CallableContract {
+  host: { req: HostRequest; res: HostResponse };
 }
 export type CallableName = keyof CallableContract;
 

@@ -1,8 +1,8 @@
-import type { CallableContract, GameMeta, LiveGameDoc, LockAction, QuizDoc } from "../../../shared/types";
+import type { GameMeta, HostAction, HostActionMap, LiveGameDoc, LockAction, QuizDoc } from "../../../shared/types";
 import { validateQuiz } from "../../../shared/quizValidate";
 import { club } from "../../../src/club.config";
 import type { AuthLike } from "../core/auth";
-import { parseBool, parsePin, parseQIndex, parseQuizId, parseUid } from "../core/auth";
+import { parseBool, parseHostAction, parsePin, parseQIndex, parseQuizId, parseUid } from "../core/auth";
 import { stepStatus } from "../core/transitions";
 import { busyError, isLockActive } from "../core/lock";
 import { GameError } from "../core/errors";
@@ -37,7 +37,7 @@ import { database, firestore } from "./firebase";
 export const gameConfig: GameConfig = club.game;
 const namePrefix = club.locale === "en" ? "Player" : "Oyuncu";
 
-type Res<N extends keyof CallableContract> = Promise<CallableContract[N]["res"]>;
+type Res<N extends HostAction> = Promise<HostActionMap[N]["res"]>;
 
 export async function createGame(auth: AuthLike | undefined, data: unknown): Res<"createGame"> {
   const uid = await requireAllowedHost(auth);
@@ -221,4 +221,26 @@ export async function setLobbyLocked(auth: AuthLike | undefined, data: unknown):
   const [uid, head] = await Promise.all([requireAllowedHost(auth), readHead(pin)]);
   await updateRoom(pin, planSetLobbyLocked(head, { uid, now: Date.now(), config: gameConfig }, locked));
   return { ok: true, locked };
+}
+
+type Handler<A extends HostAction> = (auth: AuthLike | undefined, data: unknown) => Res<A>;
+
+const HANDLERS: { [A in HostAction]: Handler<A> } = {
+  createGame,
+  startGame,
+  reveal,
+  showLeaderboard,
+  nextQuestion,
+  endGame,
+  kickPlayer,
+  setLobbyLocked,
+};
+
+/** The single `host` callable: `{ action, ...args }` → that action's handler. */
+export async function dispatchHost(
+  auth: AuthLike | undefined,
+  data: unknown,
+): Promise<{ action: HostAction; result: HostActionMap[HostAction]["res"] }> {
+  const action = parseHostAction(data);
+  return { action, result: await HANDLERS[action](auth, data) };
 }
