@@ -37,7 +37,7 @@ export function useHostAuth(): HostAuth {
       if (alive) setState({ status: "loading", user });
       let allowed = false;
       try {
-        allowed = (await getDoc(doc(firestore, "allowedHosts", u.email.toLowerCase()))).exists();
+        allowed = (await getDoc(doc(firestore, "allowedHosts", u.email))).exists();
       } catch {
         allowed = false;
       }
