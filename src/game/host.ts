@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from "firebase/auth";
 import { addDoc, collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import type { Quiz, QuizDoc } from "../../shared/types";
-import { auth, firestore } from "../firebase";
+import { auth } from "../firebase";
+import { firestore } from "../firestore";
 
 export type HostStatus = "loading" | "signedOut" | "unauthorized" | "authorized";
 

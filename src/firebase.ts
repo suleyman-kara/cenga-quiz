@@ -1,6 +1,5 @@
 import { initializeApp, type FirebaseOptions } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { connectDatabaseEmulator, getDatabase } from "firebase/database";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import { FUNCTIONS_REGION, type CallableContract, type CallableName } from "../shared/types";
@@ -9,6 +8,7 @@ const env = import.meta.env;
 const DEMO_PROJECT = "demo-club-quiz";
 
 /** Emulators when explicitly requested, or in dev when no real project is configured. */
+/** Firestore lives in ./firestore.ts so the player bundle does not load it. */
 export const useEmulators =
   env.VITE_USE_EMULATORS === "true" || (env.DEV && !env.VITE_FIREBASE_PROJECT_ID);
 
@@ -30,13 +30,11 @@ const options: FirebaseOptions = useEmulators
 
 export const app = initializeApp(options);
 export const auth = getAuth(app);
-export const firestore = getFirestore(app);
 export const db = getDatabase(app);
 export const functions = getFunctions(app, FUNCTIONS_REGION);
 
 if (useEmulators) {
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectFirestoreEmulator(firestore, "127.0.0.1", 8080);
   connectDatabaseEmulator(db, "127.0.0.1", 9000);
   connectFunctionsEmulator(functions, "127.0.0.1", 5001);
 }
