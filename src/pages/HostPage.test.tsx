@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { translate } from "../i18n";
 import { club } from "../club.config";
 import { HostPage } from "./HostPage";
-import { useHostAuth, useMyQuizzes, saveQuiz } from "../game/host";
+import { useHostAuth, useMyQuizzes, saveQuiz, deleteQuiz } from "../game/host";
 import { validateQuiz } from "../../shared/quizValidate";
 import { hostCall } from "../firebase";
 
 vi.mock("../firebase", () => ({ hostCall: vi.fn() }));
-vi.mock("../game/host", () => ({ useHostAuth: vi.fn(), useMyQuizzes: vi.fn(), saveQuiz: vi.fn() }));
+vi.mock("../game/host", () => ({ useHostAuth: vi.fn(), useMyQuizzes: vi.fn(), saveQuiz: vi.fn(), deleteQuiz: vi.fn() }));
 vi.mock("../../shared/quizValidate", () => ({ validateQuiz: vi.fn() }));
 
 const t = (k: Parameters<typeof translate>[1], v?: Record<string, string | number>) => translate(club.locale, k, v);
@@ -23,9 +23,15 @@ function renderPage() {
       <Routes>
         <Route path="/host" element={<HostPage />} />
         <Route path="/host/game/:pin" element={<div>BIG SCREEN</div>} />
+        <Route path="/host/quiz/:id" element={<EditorProbe />} />
       </Routes>
     </MemoryRouter>,
   );
+}
+
+function EditorProbe() {
+  const { id } = useParams();
+  return <div>EDITOR {id}</div>;
 }
 
 const validQuiz = { title: "Genel kültür", questions: [{ text: "S1", options: ["a", "b"], correct: 0 }] };
@@ -40,6 +46,7 @@ describe("HostPage", () => {
       error: null,
     });
     vi.mocked(saveQuiz).mockReset().mockResolvedValue("newId");
+    vi.mocked(deleteQuiz).mockReset().mockResolvedValue(undefined);
     vi.mocked(validateQuiz).mockReset();
     vi.mocked(hostCall).mockReset();
   });
@@ -111,5 +118,26 @@ describe("HostPage", () => {
     const file = new File([JSON.stringify(validQuiz)], "quiz.json", { type: "application/json" });
     await userEvent.upload(screen.getByLabelText(t("host.importFile")), file);
     expect(await screen.findByDisplayValue(/Genel kültür/)).toBeInTheDocument();
+  });
+
+  it("New quiz opens the editor", async () => {
+    renderPage();
+    await userEvent.click(screen.getByRole("link", { name: t("host.newQuiz") }));
+    expect(screen.getByText("EDITOR yeni")).toBeInTheDocument();
+  });
+
+  it("Edit opens the editor for that quiz", async () => {
+    renderPage();
+    await userEvent.click(screen.getByRole("link", { name: t("host.editQuiz") }));
+    expect(screen.getByText("EDITOR quiz1")).toBeInTheDocument();
+  });
+
+  it("Delete asks first, then deletes", async () => {
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: t("host.deleteQuiz") }));
+    expect(screen.getByText(t("host.deleteConfirm", { title: "Tarih" }))).toBeInTheDocument();
+    expect(deleteQuiz).not.toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: t("host.deleteOk") }));
+    expect(deleteQuiz).toHaveBeenCalledWith("quiz1");
   });
 });

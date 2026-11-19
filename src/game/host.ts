@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from "firebase/auth";
-import { addDoc, collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import type { Quiz, QuizDoc } from "../../shared/types";
 import { auth } from "../firebase";
 import { firestore } from "../firestore";
@@ -109,4 +109,29 @@ export async function saveQuiz(uid: string, quiz: Quiz): Promise<string> {
   const data: QuizDoc = { ...clean, ownerUid: uid, createdAt: now, updatedAt: now };
   const ref = await addDoc(collection(firestore, "quizzes"), data);
   return ref.id;
+}
+
+/** Reads one of the host's own quizzes for editing; null when missing. */
+export async function loadQuiz(id: string): Promise<Quiz | null> {
+  const snap = await getDoc(doc(firestore, "quizzes", id));
+  if (!snap.exists()) return null;
+  const d = snap.data() as Partial<QuizDoc>;
+  const quiz: Quiz = { title: d.title ?? "", questions: d.questions ?? [] };
+  if (d.description) quiz.description = d.description;
+  return quiz;
+}
+
+/** Replaces title, description and questions of an existing quiz (owner and createdAt stay). */
+export async function updateQuiz(id: string, quiz: Quiz): Promise<void> {
+  const clean = JSON.parse(JSON.stringify(quiz)) as Quiz;
+  await updateDoc(doc(firestore, "quizzes", id), {
+    title: clean.title,
+    description: clean.description ?? deleteField(),
+    questions: clean.questions,
+    updatedAt: Date.now(),
+  });
+}
+
+export async function deleteQuiz(id: string): Promise<void> {
+  await deleteDoc(doc(firestore, "quizzes", id));
 }

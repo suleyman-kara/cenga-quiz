@@ -1245,3 +1245,146 @@
   font-size: 0.95rem;
   grid-template-columns: 2.2rem 1fr auto auto;
 }
+
+/* ---------- sunucu paneli: quiz kartı düğmeleri ---------- */
+.dashboard__new {
+  align-self: flex-start;
+  margin-top: var(--s-2);
+}
+
+.quiz-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+/* ---------- quiz düzenleme ekranı ---------- */
+.editor-page {
+  gap: var(--s-5);
+}
+
+.editor {
+  gap: var(--s-4);
+}
+
+.editor__questions {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--s-4);
+}
+
+.editor-q {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.editor-q__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.editor-q__tools {
+  display: flex;
+  gap: var(--s-1);
+}
+
+.editor-q__options {
+  border: 0;
+  padding: 0;
+  margin: var(--s-2) 0 0;
+  display: grid;
+  gap: var(--s-2);
+}
+
+.editor-opt {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 6px 4px 10px;
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+}
+
+.editor-opt[data-correct] {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.editor-opt input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-accent);
+}
+
+.editor-opt__shape {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--c);
+  color: #fff;
+}
+
+.editor-opt__shape .choice-shape {
+  width: 18px;
+  height: 18px;
+}
+
+.editor-q__add-opt {
+  justify-self: start;
+}
+
+.editor-q__extra {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: var(--s-3);
+  margin-top: var(--s-2);
+}
+
+@media (max-width: 560px) {
+  .editor-q__extra {
+    grid-template-columns: 1fr;
+  }
+}
+
+.editor-q__errors {
+  margin: var(--s-2) 0 0;
+  padding-left: var(--s-5);
+}
+
+.editor__add-q {
+  justify-self: start;
+  align-self: flex-start;
+}
+
+.editor__bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  background: var(--color-background);
+  border-top: 1px solid var(--color-border);
+}
+
+/* panel ve düzenleyicide silme: dolu değil, kırmızı yazılı çerçeveli */
+.quiz-card__actions .btn--ghost.btn--danger,
+.editor .btn--ghost.btn--danger {
+  background: transparent;
+  color: var(--color-danger);
+  box-shadow: none;
+}
+
+.quiz-card__actions .btn--ghost.btn--danger:hover:not(:disabled),
+.editor .btn--ghost.btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}

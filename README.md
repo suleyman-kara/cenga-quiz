@@ -23,8 +23,9 @@ canlı quiz sistemi.
   takma ad filtresi, en fazla 300 oyuncu (ayarlanabilir).
 - **Kopmaya dayanıklı:** Oyuncu ekranı kilitlerse ya da sunucu bilgisayarı
   bağlantıyı kaybederse oyun kaldığı yerden devam eder.
-- **Quiz'ler JSON:** Sorular JSON dosyasından içe aktarılır; editör desteği için
-  [JSON Schema](quizzes/quiz.schema.json) var.
+- **Quiz hazırlama:** Sorular sunucu panelinden elle eklenip düzenlenir (şık sayısı,
+  doğru cevap, süre, görsel) ya da JSON dosyasından içe aktarılır; editör desteği
+  için [JSON Schema](quizzes/quiz.schema.json) var.
 - **KVKK'ya uygun varsayılanlar:** Sadece takma ad, cevap ve puan saklanır; veriler
   AB'de (Belçika) tutulur ve sonuçlar belirli bir süre sonra otomatik silinir.
 - **Düşük maliyet:** Kulüp ölçeğinde Firebase'in ücretsiz kotalarının altında kalır.

@@ -8,6 +8,7 @@ import { t } from "./i18n";
 // Host screens (Firestore, Google sign-in) are loaded only when visited.
 const HostPage = lazy(() => import("./pages/HostPage").then((m) => ({ default: m.HostPage })));
 const HostGame = lazy(() => import("./pages/HostGame").then((m) => ({ default: m.HostGame })));
+const QuizEditor = lazy(() => import("./pages/QuizEditor").then((m) => ({ default: m.QuizEditor })));
 
 /** Renders `children` only for a well-formed :pin; anything else goes home with a message. */
 function ValidPin({ children }: { children: ReactNode }) {
@@ -30,6 +31,7 @@ export function AppRoutes() {
           }
         />
         <Route path="/host" element={<HostPage />} />
+        <Route path="/host/quiz/:id" element={<QuizEditor />} />
         <Route
           path="/host/game/:pin"
           element={

@@ -502,7 +502,9 @@ a {
 
 /* the host panel is a desk screen: give it more room than the phone column */
 .layout__main:has(.dashboard),
-.layout:has(.dashboard) .layout__bar {
+.layout:has(.dashboard) .layout__bar,
+.layout__main:has(.editor-page),
+.layout:has(.editor-page) .layout__bar {
   max-width: 1080px;
   width: 100%;
   margin-inline: auto;

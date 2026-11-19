@@ -1,11 +1,12 @@
 import { useState, type ChangeEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { validateQuiz } from "../../shared/quizValidate";
-import { saveQuiz, useMyQuizzes, type HostUser } from "../game/host";
+import { deleteQuiz, saveQuiz, useMyQuizzes, type HostUser } from "../game/host";
 import { HostGate } from "../host/HostGate";
 import { Layout } from "../components/Layout";
 import { ChoiceShape } from "../components/ChoiceShape";
 import { Loading } from "../components/Loading";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { club } from "../club.config";
 import { hostCall } from "../firebase";
 import { t } from "../i18n";
@@ -19,6 +20,18 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
   const { quizzes, loading, error } = useMyQuizzes(user.uid);
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [toDelete, setToDelete] = useState<{ id: string; title: string } | null>(null);
+
+  async function confirmDelete() {
+    const target = toDelete;
+    setToDelete(null);
+    if (!target) return;
+    try {
+      await deleteQuiz(target.id);
+    } catch (err) {
+      setStartError(t("common.error", { message: (err as Error).message }));
+    }
+  }
 
   async function start(quizId: string) {
     if (starting) return;
@@ -46,6 +59,9 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
           <div className="dashboard__head">
             <h1 className="headline">{t("host.myQuizzes")}</h1>
             <p className="muted">{t("host.signedInAs", { email: user.email ?? "" })}</p>
+            <Link className="btn btn--primary btn--small dashboard__new" to="/host/quiz/yeni">
+              {t("host.newQuiz")}
+            </Link>
           </div>
           {startError && (
             <p className="field__error" role="alert">
@@ -81,15 +97,27 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
                       {t("host.questionsCount", { count: q.questionCount })}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn--primary"
-                    aria-busy={starting === q.id || undefined}
-                    disabled={starting !== null}
-                    onClick={() => void start(q.id)}
-                  >
-                    {starting === q.id ? t("host.creating") : t("host.createGame")}
-                  </button>
+                  <div className="quiz-card__actions">
+                    <Link className="btn btn--ghost btn--small" to={`/host/quiz/${q.id}`}>
+                      {t("host.editQuiz")}
+                    </Link>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--small btn--danger"
+                      onClick={() => setToDelete({ id: q.id, title: q.title })}
+                    >
+                      {t("host.deleteQuiz")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      aria-busy={starting === q.id || undefined}
+                      disabled={starting !== null}
+                      onClick={() => void start(q.id)}
+                    >
+                      {starting === q.id ? t("host.creating") : t("host.createGame")}
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -97,6 +125,14 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
         </section>
         <QuizImport uid={user.uid} />
       </div>
+      <ConfirmDialog
+        open={!!toDelete}
+        message={toDelete ? t("host.deleteConfirm", { title: toDelete.title }) : ""}
+        confirmLabel={t("host.deleteOk")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setToDelete(null)}
+      />
     </Layout>
   );
 }
