@@ -90,8 +90,10 @@ describe("game flow (host callables)", () => {
   it("reveal is allowed once the time is up even if not everyone answered", async () => {
     await newGame();
     await host.call("startGame", { pin });
+    // move the question window into the past: started 6s ago, ended 1s ago
+    const now = Date.now();
+    await adminDb().ref(`games/${pin}/state`).update({ startedAt: now - 6000, endsAt: now - 1000 });
     await adminAnswer(pin, 0, "pa", 1, 1000);
-    await adminDb().ref(`games/${pin}/state/endsAt`).set(Date.now() - 1);
     await host.call("reveal", { pin });
     const sc = await scores();
     expect(sc.pa.lastCorrect).toBe(true);
@@ -147,7 +149,7 @@ describe("game flow (host callables)", () => {
     // straight from reveal to Q2
     await host.call("nextQuestion", { pin });
     await adminAnswer(pin, 2, "pa", 2, 0);
-    await adminAnswer(pin, 2, "pb", 2, 0);
+    await adminAnswer(pin, 2, "pb", 2, 500);
     await adminAnswer(pin, 2, "pc", 2, 0);
     await host.call("reveal", { pin });
     expect(await expectCode(host.call("nextQuestion", { pin }))).toBe("functions/failed-precondition");
