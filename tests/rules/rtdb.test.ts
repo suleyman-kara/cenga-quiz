@@ -332,6 +332,31 @@ describe("RTDB: answers", () => {
   });
 });
 
+describe("RTDB: transition lock (state.lock)", () => {
+  const lockAt = (at: number) => owner().ref(`${G}/state/lock`).set({ by: "reveal", at });
+  it("answers are rejected while a fresh lock is held, accepted once it is stale", async () => {
+    await seed({ phase: "question", qIndex: 0 });
+    await lockAt(Date.now());
+    await assertFails(player(P1).ref(`${G}/answers/0/${P1}`).set({ choice: 1, at: serverTimestamp() }));
+    await lockAt(Date.now() - 31_000);
+    await assertSucceeds(player(P1).ref(`${G}/answers/0/${P1}`).set({ choice: 1, at: serverTimestamp() }));
+  });
+  it("joins and leaves are rejected while a fresh lock is held", async () => {
+    await seed();
+    await lockAt(Date.now());
+    await assertFails(player(OUTSIDER).ref(`${G}/players/${OUTSIDER}`).set({ name: "Ali", joinedAt: serverTimestamp() }));
+    await assertFails(player(P1).ref(`${G}/players/${P1}`).remove());
+    await lockAt(Date.now() - 31_000);
+    await assertSucceeds(player(OUTSIDER).ref(`${G}/players/${OUTSIDER}`).set({ name: "Ali", joinedAt: serverTimestamp() }));
+  });
+  it("clients cannot write the lock", async () => {
+    await seed({ phase: "question" });
+    await assertFails(host().ref(`${G}/state/lock`).set({ by: "reveal", at: Date.now() }));
+    await lockAt(Date.now());
+    await assertFails(player(P1).ref(`${G}/state/lock`).remove());
+  });
+});
+
 describe("RTDB: scores", () => {
   it("host reads all scores", async () => {
     await seed({ phase: "reveal" });
