@@ -125,7 +125,7 @@ describe("planNext", () => {
   });
   it("leaderboard → next question", () => {
     const r = applyPatch(revealed(), { "state/phase": "leaderboard" });
-    expect(applyPatch(r, planNext(r, { ...host, now: 30_000 })).state.qIndex).toBe(1);
+    expect(applyPatch(r, planNext(r, { ...host, now: 30_000 })).state?.qIndex).toBe(1);
   });
   it("refused past the last question", () => {
     const r = applyPatch(revealed(), { "state/qIndex": 1 });
