@@ -34,8 +34,8 @@ describe("parseFirebaseConfig", () => {
 
   it("parses plain JSON too", () => {
     const r = parseFirebaseConfig(
-      JSON.stringify({ apiKey: "k", authDomain: "p.firebaseapp.com", projectId: "p", appId: "1:2:web:3",
-        databaseURL: "https://p-default-rtdb.europe-west1.firebasedatabase.app" }),
+      JSON.stringify({ apiKey: "k", authDomain: "proj-x.firebaseapp.com", projectId: "proj-x", appId: "1:2:web:3",
+        databaseURL: "https://proj-x-default-rtdb.europe-west1.firebasedatabase.app" }),
     );
     expect(r.ok).toBe(true);
   });

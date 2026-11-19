@@ -9,3 +9,6 @@ functions/lib/
 .firebase/
 coverage/
 .DS_Store
+.env.*.local
+functions/.env.*
+!functions/.env.example
