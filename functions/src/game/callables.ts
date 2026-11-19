@@ -21,7 +21,7 @@ import {
   type OpContext,
 } from "../core/ops";
 import { buildGameResult, resultIdFor } from "../core/archive";
-import { requireAllowedHost } from "./hostAuth";
+import { requireAllowedHost, requireHostIdentity } from "./hostAuth";
 import {
   acquireLock,
   loadLiveQuiz,
@@ -135,11 +135,9 @@ async function transition(
 ): Promise<{ pin: string; room: Room; already: boolean }> {
   const pin = parsePin(data);
   const expected = spec.step ? parseQIndex(data) : undefined;
-  const [uid, quiz, head] = await Promise.all([
-    requireAllowedHost(auth),
-    spec.needsQuiz ? loadLiveQuiz(pin) : undefined,
-    readHead(pin),
-  ]);
+  // Authorize first: nothing about the room is loaded for a caller who is not a host.
+  const uid = await requireAllowedHost(auth);
+  const [quiz, head] = await Promise.all([spec.needsQuiz ? loadLiveQuiz(pin) : undefined, readHead(pin)]);
   const ctx = (now: number): OpContext => ({ uid, now, config: gameConfig, quiz, namePrefix });
 
   const active = assertHost(head, uid);
@@ -213,7 +211,8 @@ export async function endGame(auth: AuthLike | undefined, data: unknown): Res<"e
  * another step holds the lock this fails with the retryable busy error.
  */
 async function kick(auth: AuthLike | undefined, pin: string, targets: string[]): Promise<void> {
-  const [uid, head] = await Promise.all([requireAllowedHost(auth), readHead(pin)]);
+  const uid = await requireAllowedHost(auth);
+  const head = await readHead(pin);
   const ctx = (now: number): OpContext => ({ uid, now, config: gameConfig });
   planKickMany(head, ctx(Date.now()), targets); // host / phase checks before taking the lock
   const { state, lock } = await acquireLock(pin, "kick", (current, now) => {
@@ -241,7 +240,8 @@ export async function kickPlayers(auth: AuthLike | undefined, data: unknown): Re
 export async function setLobbyLocked(auth: AuthLike | undefined, data: unknown): Res<"setLobbyLocked"> {
   const pin = parsePin(data);
   const locked = parseBool(data, "locked");
-  const [uid, head] = await Promise.all([requireAllowedHost(auth), readHead(pin)]);
+  const uid = await requireAllowedHost(auth);
+  const head = await readHead(pin);
   await updateRoom(pin, planSetLobbyLocked(head, { uid, now: Date.now(), config: gameConfig }, locked));
   return { ok: true, locked };
 }
@@ -266,5 +266,7 @@ export async function dispatchHost(
   data: unknown,
 ): Promise<{ action: HostAction; result: HostActionMap[HostAction]["res"] }> {
   const action = parseHostAction(data);
+  // Every action needs a signed-in caller with a verified e-mail: refuse others before any I/O.
+  requireHostIdentity(auth);
   return { action, result: await HANDLERS[action](auth, data) };
 }
