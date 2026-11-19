@@ -29,6 +29,13 @@ describe("classifyRoom", () => {
   it("keeps active rooms", () => {
     expect(classifyRoom(room("question", now - 5 * HOUR), now, opts)).toBe("keep");
   });
+  it("idle time counts from the later of state.updatedAt and meta.lastActivityAt (joins, kicks, lock)", () => {
+    // lobby created 7 h ago, someone joined 1 h ago: still in use
+    expect(classifyRoom(room("lobby", now - 7 * HOUR, { "meta/lastActivityAt": now - HOUR }), now, opts)).toBe("keep");
+    expect(classifyRoom(room("lobby", now - 7 * HOUR, { "meta/lastActivityAt": now - 6.5 * HOUR }), now, opts)).toBe("remove");
+    // an ended room's grace period still counts from the end
+    expect(classifyRoom(room("ended", now - 31 * MIN, { "meta/archived": true, "meta/lastActivityAt": now - 40 * MIN }), now, opts)).toBe("remove");
+  });
   it("removes abandoned rooms without scores", () => {
     expect(classifyRoom(room("lobby", now - 7 * HOUR), now, opts)).toBe("remove");
   });

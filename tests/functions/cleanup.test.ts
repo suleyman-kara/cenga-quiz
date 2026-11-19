@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { adminDb, adminFs, resetEmulators } from "./helpers";
+import { adminDb, adminFs, readRoom, resetEmulators } from "./helpers";
 import { runCleanup } from "../../functions/src/game/cleanup";
 import { club } from "../../src/club.config";
 
@@ -94,6 +94,24 @@ describe("runCleanup", () => {
     expect((await adminFs().doc("gameResults/100002_" + (abandoned - HOUR)).get()).exists).toBe(true);
     expect((await adminFs().doc("liveGames/100009").get()).exists).toBe(false);
     expect(summary).toMatchObject({ removed: 2, archived: 1, orphanSnapshots: 1, failed: 2 });
+  });
+
+  it("keeps a lobby created 7 h ago in which someone joined 1 h ago (meta.lastActivityAt via the join trigger)", async () => {
+    const now = Date.now();
+    const old = room("lobby", now - 7 * HOUR);
+    delete (old as { players?: unknown }).players;
+    await adminDb().ref("games/200000").set(old);
+    await adminDb().ref("games/200000/players/late").set({ name: "Geç", joinedAt: now - HOUR });
+    const end = Date.now() + 15_000;
+    while ((await readRoom<number | null>("200000", "meta/lastActivityAt")) !== now - HOUR) {
+      if (Date.now() > end) throw new Error("join trigger did not set meta.lastActivityAt");
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await runCleanup(now);
+    expect(await readRoom("200000", "meta")).not.toBeNull();
+    // ...and it is removed once that activity is old enough too
+    await runCleanup(now + 5.5 * HOUR);
+    expect(await readRoom("200000", "meta")).toBeNull();
   });
 
   it("is a no-op on an empty database", async () => {

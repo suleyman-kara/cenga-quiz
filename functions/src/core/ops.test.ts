@@ -214,7 +214,7 @@ describe("planKick", () => {
   });
   it("works in the lobby (no leaderboard written) and for unknown uids", () => {
     const patch = planKick(lobbyRoom(), { ...host, now: 1 }, "ghost");
-    expect(patch).toEqual({ "players/ghost": null, "scores/ghost": null, "banned/ghost": true });
+    expect(patch).toEqual({ "players/ghost": null, "scores/ghost": null, "banned/ghost": true, "meta/lastActivityAt": 1 });
   });
   it("host only, not after the game ended", () => {
     expect(errCode(() => planKick(lobbyRoom(), { ...host, uid: "x", now: 1 }, "p1"))).toBe("permission-denied");
@@ -225,8 +225,11 @@ describe("planKick", () => {
 
 describe("planSetLobbyLocked", () => {
   it("sets meta.locked", () => {
-    expect(planSetLobbyLocked(lobbyRoom(), { ...host, now: 1 }, true)).toEqual({ "meta/locked": true });
-    expect(planSetLobbyLocked(lobbyRoom(), { ...host, now: 1 }, false)).toEqual({ "meta/locked": false });
+    expect(planSetLobbyLocked(lobbyRoom(), { ...host, now: 1 }, true)).toMatchObject({ "meta/locked": true });
+    expect(planSetLobbyLocked(lobbyRoom(), { ...host, now: 1 }, false)).toMatchObject({ "meta/locked": false });
+  });
+  it("counts as lobby activity (meta.lastActivityAt)", () => {
+    expect(planSetLobbyLocked(lobbyRoom(), { ...host, now: 77 }, true)["meta/lastActivityAt"]).toBe(77);
   });
   it("host only, not after the game ended", () => {
     expect(errCode(() => planSetLobbyLocked(lobbyRoom(), { ...host, uid: "x", now: 1 }, true))).toBe("permission-denied");

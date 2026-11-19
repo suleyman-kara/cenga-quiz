@@ -132,7 +132,7 @@ export function planKick(room: Room | null | undefined, ctx: OpContext, target: 
 /** Removes players (and their scores) and bans their uids, in one patch. */
 export function planKickMany(room: Room | null | undefined, ctx: OpContext, targets: readonly string[]): Patch {
   const r = guard(room, ctx, "kick");
-  const patch: Patch = {};
+  const patch: Patch = { "meta/lastActivityAt": ctx.now };
   for (const t of targets) Object.assign(patch, { [`players/${t}`]: null, [`scores/${t}`]: null, [`banned/${t}`]: true });
   if (r.leaderboard) {
     // Keep the big screen clean: rebuild the leaderboard (and ranks) without the kicked players.
@@ -151,5 +151,5 @@ export function planKickMany(room: Room | null | undefined, ctx: OpContext, targ
 
 export function planSetLobbyLocked(room: Room | null | undefined, ctx: OpContext, locked: boolean): Patch {
   guard(room, ctx, "lockLobby");
-  return { "meta/locked": locked };
+  return { "meta/locked": locked, "meta/lastActivityAt": ctx.now };
 }

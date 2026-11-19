@@ -12,7 +12,8 @@ export interface CleanupOptions {
 
 export function classifyRoom(room: Room | null | undefined, now: number, opts: CleanupOptions): CleanupAction {
   if (!room?.meta && !room?.state) return "remove";
-  const lastActivity = room.state?.updatedAt ?? room.meta?.createdAt ?? 0;
+  // A lobby can be busy (joins, kicks, lock toggles) without any state change.
+  const lastActivity = Math.max(room.state?.updatedAt ?? room.meta?.createdAt ?? 0, room.meta?.lastActivityAt ?? 0);
   const idle = now - lastActivity;
   const archived = room.meta?.archived === true;
   if (room.state?.phase === "ended") {
