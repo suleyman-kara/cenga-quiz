@@ -170,10 +170,10 @@ export interface Leaderboard {
 export interface CallableContract {
   createGame: { req: { quizId: string }; res: { pin: string } };
   startGame: { req: { pin: string }; res: { ok: true } };
-  reveal: { req: { pin: string }; res: { ok: true } };
-  showLeaderboard: { req: { pin: string }; res: { ok: true } };
-  nextQuestion: { req: { pin: string }; res: { ok: true } };
-  endGame: { req: { pin: string }; res: { ok: true; resultId: string } };
+  reveal: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
+  showLeaderboard: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
+  nextQuestion: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
+  endGame: { req: { pin: string }; res: { ok: true; resultId: string; already?: true } };
   kickPlayer: { req: { pin: string; uid: string }; res: { ok: true } };
   setLobbyLocked: { req: { pin: string; locked: boolean }; res: { ok: true; locked: boolean } };
 }

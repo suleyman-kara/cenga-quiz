@@ -22,11 +22,17 @@ export interface OpContext {
 
 type ActiveRoom = Room & Required<Pick<Room, "meta" | "state">>;
 
-export function guard(room: Room | null | undefined, ctx: OpContext, action: GameAction): ActiveRoom {
+/** The room exists and the caller is its host. */
+export function assertHost(room: Room | null | undefined, uid: string): ActiveRoom {
   if (!room?.meta || !room.state) throw new GameError("not-found", "Oyun bulunamadı.");
-  if (room.meta.hostUid !== ctx.uid) throw new GameError("permission-denied", "Bu oyunun sunucusu değilsiniz.");
-  assertTransition(room.state.phase, action);
+  if (room.meta.hostUid !== uid) throw new GameError("permission-denied", "Bu oyunun sunucusu değilsiniz.");
   return room as ActiveRoom;
+}
+
+export function guard(room: Room | null | undefined, ctx: OpContext, action: GameAction): ActiveRoom {
+  const r = assertHost(room, ctx.uid);
+  assertTransition(r.state.phase, action);
+  return r;
 }
 
 function needQuiz(ctx: OpContext): Quiz {

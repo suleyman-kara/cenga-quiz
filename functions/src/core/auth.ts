@@ -57,3 +57,12 @@ export function parseBool(data: unknown, key: string): boolean {
   if (typeof v !== "boolean") throw new GameError("invalid-argument", `Geçersiz değer: ${key}.`);
   return v;
 }
+
+/** Expected current question index for idempotent host steps. */
+export function parseQIndex(data: unknown): number {
+  const q = field(data, "qIndex");
+  if (typeof q !== "number" || !Number.isInteger(q) || q < 0 || q > 10_000) {
+    throw new GameError("invalid-argument", "Geçersiz soru sırası (qIndex).");
+  }
+  return q;
+}

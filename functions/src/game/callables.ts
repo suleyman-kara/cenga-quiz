@@ -2,12 +2,14 @@ import type { CallableContract, GameMeta, LiveGameDoc, LockAction, QuizDoc } fro
 import { validateQuiz } from "../../../shared/quizValidate";
 import { club } from "../../../src/club.config";
 import type { AuthLike } from "../core/auth";
-import { parseBool, parsePin, parseQuizId, parseUid } from "../core/auth";
+import { parseBool, parsePin, parseQIndex, parseQuizId, parseUid } from "../core/auth";
+import { stepStatus } from "../core/transitions";
 import { busyError, isLockActive } from "../core/lock";
 import { GameError } from "../core/errors";
 import { allocatePin, securePin } from "../core/pin";
 import { applyPatch, newRoom, type GameConfig, type Patch, type Room } from "../core/room";
 import {
+  assertHost,
   guard,
   planEnd,
   planKick,
@@ -82,13 +84,32 @@ interface TransitionSpec {
   parts: readonly RoomPart[];
   /** dry-run the plan on unlocked data first, so precondition failures never take the lock */
   precheck: boolean;
+  /** request carries the qIndex the host is looking at (idempotent step) */
+  step?: boolean;
 }
+
+/** Thrown inside the lock transaction when the room already moved past the requested step. */
+class AlreadyDone extends Error {}
 
 const SPECS = {
   start: { action: "start", plan: planStart, needsQuiz: true, parts: ["players"], precheck: true },
-  reveal: { action: "reveal", plan: planReveal, needsQuiz: true, parts: ["players", "answers", "scores"], precheck: true },
-  showLeaderboard: { action: "showLeaderboard", plan: planShowLeaderboard, needsQuiz: false, parts: [], precheck: false },
-  next: { action: "next", plan: planNext, needsQuiz: true, parts: [], precheck: false },
+  reveal: {
+    action: "reveal",
+    plan: planReveal,
+    needsQuiz: true,
+    parts: ["players", "answers", "scores"],
+    precheck: true,
+    step: true,
+  },
+  showLeaderboard: {
+    action: "showLeaderboard",
+    plan: planShowLeaderboard,
+    needsQuiz: false,
+    parts: [],
+    precheck: false,
+    step: true,
+  },
+  next: { action: "next", plan: planNext, needsQuiz: true, parts: [], precheck: false, step: true },
   end: { action: "end", plan: planEnd, needsQuiz: false, parts: ["players", "scores", "leaderboard"], precheck: false },
 } satisfies Record<LockAction, TransitionSpec>;
 
@@ -106,8 +127,9 @@ async function transition(
   spec: TransitionSpec,
   /** runs after the result is computed and before it is written (may extend the patch) */
   beforeWrite?: (pin: string, room: Room, patch: Patch, now: number) => Promise<void>,
-): Promise<{ pin: string; room: Room; patch: Patch; now: number }> {
+): Promise<{ pin: string; room: Room; already: boolean }> {
   const pin = parsePin(data);
+  const expected = spec.step ? parseQIndex(data) : undefined;
   const [uid, quiz, head] = await Promise.all([
     requireAllowedHost(auth),
     spec.needsQuiz ? loadLiveQuiz(pin) : undefined,
@@ -115,12 +137,24 @@ async function transition(
   ]);
   const ctx = (now: number): OpContext => ({ uid, now, config: gameConfig, quiz, namePrefix });
 
-  const pre = spec.precheck ? await readParts(pin, spec.parts, head.state?.qIndex) : {};
+  const active = assertHost(head, uid);
+  if (stepStatus(active.state, spec.action, expected) === "already") return { pin, room: head, already: true };
+  const pre = spec.precheck ? await readParts(pin, spec.parts, active.state.qIndex) : {};
   spec.plan({ ...head, ...pre }, ctx(Date.now()));
 
-  const { state, lock } = await acquireLock(pin, spec.action, (current, now) => {
-    guard({ meta: head.meta, state: current }, ctx(now), spec.action);
-  });
+  let locked: Awaited<ReturnType<typeof acquireLock>>;
+  try {
+    locked = await acquireLock(pin, spec.action, (current, now) => {
+      const room = { meta: head.meta, state: current };
+      assertHost(room, uid);
+      if (stepStatus(current, spec.action, expected) === "already") throw new AlreadyDone();
+      guard(room, ctx(now), spec.action);
+    });
+  } catch (e) {
+    if (e instanceof AlreadyDone) return { pin, room: head, already: true };
+    throw e;
+  }
+  const { state, lock } = locked;
   try {
     const parts = await readParts(pin, spec.parts, state.qIndex);
     const room: Room = { ...head, ...parts, state };
@@ -128,12 +162,14 @@ async function transition(
     const patch = spec.plan(room, ctx(now));
     await beforeWrite?.(pin, room, patch, now);
     await writePatch(pin, patch);
-    return { pin, room, patch, now };
+    return { pin, room: applyPatch(room, patch), already: false };
   } catch (e) {
     await releaseLock(pin, lock).catch(() => undefined);
     throw e;
   }
 }
+
+const stepResult = (already: boolean) => (already ? { ok: true as const, already: true as const } : { ok: true as const });
 
 export async function startGame(auth: AuthLike | undefined, data: unknown): Res<"startGame"> {
   await transition(auth, data, SPECS.start);
@@ -141,30 +177,27 @@ export async function startGame(auth: AuthLike | undefined, data: unknown): Res<
 }
 
 export async function reveal(auth: AuthLike | undefined, data: unknown): Res<"reveal"> {
-  await transition(auth, data, SPECS.reveal);
-  return { ok: true };
+  return stepResult((await transition(auth, data, SPECS.reveal)).already);
 }
 
 export async function showLeaderboard(auth: AuthLike | undefined, data: unknown): Res<"showLeaderboard"> {
-  await transition(auth, data, SPECS.showLeaderboard);
-  return { ok: true };
+  return stepResult((await transition(auth, data, SPECS.showLeaderboard)).already);
 }
 
 export async function nextQuestion(auth: AuthLike | undefined, data: unknown): Res<"nextQuestion"> {
-  await transition(auth, data, SPECS.next);
-  return { ok: true };
+  return stepResult((await transition(auth, data, SPECS.next)).already);
 }
 
 export async function endGame(auth: AuthLike | undefined, data: unknown): Res<"endGame"> {
-  let resultId = "";
-  const { pin } = await transition(auth, data, SPECS.end, async (pin, room, patch, now) => {
+  const { pin, room, already } = await transition(auth, data, SPECS.end, async (pin, room, patch, now) => {
     // Archive BEFORE flipping to "ended": if we crash in between, the room stays locked (stale after
     // 30 s) in its old phase, and a retry or the cleanup job rewrites the same doc id — no duplicates.
-    resultId = resultIdFor(pin, room);
     const doc = buildGameResult(applyPatch(room, patch), { pin, now, retentionDays: club.game.resultsRetentionDays });
-    await (await firestore()).doc(`gameResults/${resultId}`).set(doc);
+    await (await firestore()).doc(`gameResults/${resultIdFor(pin, room)}`).set(doc);
     patch["meta/archived"] = true;
   });
+  const resultId = resultIdFor(pin, room);
+  if (already) return { ok: true, already: true, resultId };
   await (await firestore()).doc(`liveGames/${pin}`).delete();
   return { ok: true, resultId };
 }

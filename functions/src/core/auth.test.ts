@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId, parseUid, parseBool } from "./auth";
+import { requireSignedIn, requireVerifiedEmail, normalizeEmail, parsePin, parseQuizId, parseUid, parseBool, parseQIndex } from "./auth";
 import { GameError } from "./errors";
 
 function code(fn: () => unknown): string | undefined {
@@ -74,5 +74,15 @@ describe("parseBool", () => {
   });
   it.each([{}, { locked: "true" }, { locked: 1 }, null])("rejects %j", (d) => {
     expect(code(() => parseBool(d, "locked"))).toBe("invalid-argument");
+  });
+});
+
+describe("parseQIndex", () => {
+  it("accepts non-negative integers", () => {
+    expect(parseQIndex({ qIndex: 0 })).toBe(0);
+    expect(parseQIndex({ qIndex: 7 })).toBe(7);
+  });
+  it.each([{}, { qIndex: -1 }, { qIndex: 1.5 }, { qIndex: "1" }, { qIndex: null }, { qIndex: 1e9 }])("rejects %j", (d) => {
+    expect(code(() => parseQIndex(d))).toBe("invalid-argument");
   });
 });
