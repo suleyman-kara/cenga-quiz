@@ -17,7 +17,7 @@ service cloud.firestore {
         && !isAnonymous()
         && request.auth.token.get('email_verified', false) == true
         && request.auth.token.get('email', null) is string
-        && exists(/databases/$(database)/documents/allowedHosts/$(request.auth.token.email));
+        && exists(/databases/$(database)/documents/allowedHosts/$(request.auth.token.email.lower()));
     }
 
     function isOwner(data) {
@@ -30,10 +30,12 @@ service cloud.firestore {
         && d.questions is list && d.questions.size() >= 1 && d.questions.size() <= 100;
     }
 
-    // Users may only check whether their own email is an allowed host. Writes: Admin SDK only.
+    // Users may only check whether their own email is an allowed host. Doc ids are lowercase
+    // e-mails (the add-host script and Functions lowercase too). Writes: Admin SDK only.
     match /allowedHosts/{email} {
       allow get: if signedIn() && !isAnonymous()
-        && request.auth.token.get('email', null) == email;
+        && request.auth.token.get('email', null) is string
+        && request.auth.token.email.lower() == email;
     }
 
     // Quizzes contain correct answers: owner only, never players.
@@ -42,7 +44,9 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data)
         && isAllowedHost()
         && validQuiz(request.resource.data);
+      // A host removed from allowedHosts keeps read/delete on own quizzes, but cannot edit.
       allow update: if isOwner(resource.data)
+        && isAllowedHost()
         && request.resource.data.ownerUid == resource.data.ownerUid
         && validQuiz(request.resource.data);
     }
