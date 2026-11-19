@@ -42,5 +42,9 @@
     "vite": "^8.3.8",
     "vitest": "^5.1.1",
     "wait-on": "^9.5.1"
+  },
+  "overrides": {
+    "@firebase/app": "0.16.2",
+    "@firebase/app-compat": "0.5.18"
   }
 }
