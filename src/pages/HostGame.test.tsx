@@ -103,6 +103,14 @@ describe("HostGame", () => {
     expect(qr.getAttribute("data-url")).toBe(`${window.location.origin}/?pin=123456`);
   });
 
+  it("lobby: the QR comes first, the PIN is secondary, and there is no PIN chip in the header", () => {
+    renderHost();
+    const qr = screen.getByRole("img", { name: t("hostGame.qrLabel") });
+    const pin = screen.getByText("123456");
+    expect(qr.compareDocumentPosition(pin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(t("join.pinChip", { pin: "123456" }))).not.toBeInTheDocument();
+  });
+
   it("lobby: a blocked nickname is masked on the projector (data untouched), duplicates are marked", async () => {
     vi.mocked(hooks.usePlayers).mockReturnValue([
       { uid: "u0", name: "Ali", joinedAt: 0 },
