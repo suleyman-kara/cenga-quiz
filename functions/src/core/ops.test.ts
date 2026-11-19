@@ -52,6 +52,14 @@ describe("planStart", () => {
     expect(patch["players/d"]).toBeNull();
     expect(patch["players/d/name"]).toBeUndefined();
   });
+  it("applies the configured lead-in to start and next", () => {
+    const lead = { ...host, config: { ...config, leadInMs: 3000 } };
+    const r = lobbyRoom();
+    const out = applyPatch(r, planStart(r, { ...lead, now: 10_000 })) as Room;
+    expect(out.state).toMatchObject({ startedAt: 13_000, endsAt: 23_000, updatedAt: 10_000 });
+    const rev = applyPatch(out, { "state/phase": "reveal" }) as Room;
+    expect(planNext(rev, { ...lead, now: 50_000 }).state).toMatchObject({ startedAt: 53_000, endsAt: 73_000 });
+  });
   it("requires at least one player", () => {
     expect(errCode(() => planStart(lobbyRoom({}), { ...host, now: 1 }))).toBe("failed-precondition");
   });

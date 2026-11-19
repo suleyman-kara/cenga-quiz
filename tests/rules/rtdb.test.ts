@@ -300,6 +300,13 @@ describe("RTDB: answers", () => {
     await assertSucceeds(answer(P1, 2, 0));
     await assertSucceeds(answer(P2, 2, 3));
   });
+  it("rejects answering during the lead-in (before state.startedAt)", async () => {
+    await seed({ phase: "question", qIndex: 0 });
+    await owner().ref(`${G}/state/startedAt`).set(Date.now() + 60_000);
+    await assertFails(answer(P1, 0, 1));
+    await owner().ref(`${G}/state/startedAt`).set(Date.now() - 1000);
+    await assertSucceeds(answer(P1, 0, 1));
+  });
   it("rejects answering after endsAt", async () => {
     await seed({ phase: "question", qIndex: 0, endsAt: Date.now() - 1000 });
     await assertFails(answer(P1, 0, 1));

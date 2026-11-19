@@ -63,6 +63,13 @@ describe("client SDK end-to-end", () => {
       const q = (await get(ref(p.db, `games/${pin}/question`))).val() as PublicQuestion;
       expect(q.options).toHaveLength(4);
       expect(JSON.stringify(q)).not.toMatch(/correct/);
+      // answers are accepted only once the lead-in is over
+      if (i === 0) {
+        await expect(
+          set(ref(p.db, `games/${pin}/answers/0/${p.uid}`), { choice: 1, at: serverTimestamp() }),
+        ).rejects.toThrow();
+        await new Promise((r) => setTimeout(r, Math.max(0, s.startedAt - Date.now()) + 300));
+      }
       // Ali and Banu correct (1), Cem wrong (0)
       await set(ref(p.db, `games/${pin}/answers/0/${p.uid}`), { choice: i < 2 ? 1 : 0, at: serverTimestamp() });
       await new Promise((r) => setTimeout(r, 150));

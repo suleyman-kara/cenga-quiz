@@ -62,6 +62,11 @@ describe("questionPatch", () => {
     });
     expect(JSON.stringify(p)).not.toContain("correct");
   });
+  it("lead-in: the question is published now, the clock starts leadInMs later", () => {
+    const p = questionPatch(quiz, 0, 10_000, 20, 3000);
+    expect(p.state).toEqual({ phase: "question", qIndex: 0, startedAt: 13_000, endsAt: 23_000, updatedAt: 10_000 });
+    expect(p.question).toMatchObject({ index: 0, text: "S1" });
+  });
 });
 
 describe("answersFor / canReveal", () => {

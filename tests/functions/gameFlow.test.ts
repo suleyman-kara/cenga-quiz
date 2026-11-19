@@ -59,7 +59,9 @@ describe("game flow (host callables)", () => {
     expect(s.phase).toBe("question");
     expect(s.qIndex).toBe(0);
     expect(s.endsAt - s.startedAt).toBe(5000);
-    expect(Math.abs(s.startedAt - before)).toBeLessThan(10_000);
+    // lead-in: the clock starts club.game.leadInMs after the question is published
+    expect(s.startedAt - s.updatedAt).toBe(club.game.leadInMs);
+    expect(Math.abs(s.updatedAt - before)).toBeLessThan(10_000);
     const q = await readRoom<PublicQuestion>(pin, "question");
     expect(q).toEqual({ index: 0, text: "Birinci soru", options: ["A", "B", "C", "D"], seconds: 5 });
     expect(JSON.stringify(q)).not.toMatch(/correct/);
