@@ -16,6 +16,7 @@ import { HostGate } from "../host/HostGate";
 import { displayPlayers, type DisplayPlayer } from "../host/displayNames";
 import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../host/useAutoReveal";
 import { useWakeLock } from "../host/useWakeLock";
+import { useStageSounds } from "../host/useStageSounds";
 import { withRetry } from "../host/retry";
 import { friendlyError } from "../errors";
 import { Layout } from "../components/Layout";
@@ -105,6 +106,17 @@ function BigScreen({ pin }: { pin: string }) {
     onError: showError,
   });
   const computing = !!state?.lock && state.lock.at > now - LOCK_STALE_MS;
+  const timerRunning = inQuestion && !!state && started && now < state.endsAt;
+  const sound = useStageSounds(
+    state
+      ? {
+          phase: state.phase,
+          qIndex: state.qIndex,
+          players: players.length,
+          secondsLeft: timerRunning ? remainingSeconds(state.endsAt, now) : null,
+        }
+      : null,
+  );
 
   let body: ReactNode;
   let controls: ReactNode = null;
@@ -269,6 +281,23 @@ function BigScreen({ pin }: { pin: string }) {
                 </svg>
               </span>
             )}
+            <button
+              type="button"
+              className="chip chip--stage chip--sound"
+              aria-pressed={!sound.muted}
+              aria-label={t("hostGame.sound")}
+              title={t("hostGame.sound")}
+              onClick={sound.toggle}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 9h4l5-4v14l-5-4H4z" />
+                {sound.muted ? (
+                  <path d="M16.5 9.5l5 5M21.5 9.5l-5 5" />
+                ) : (
+                  <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+                )}
+              </svg>
+            </button>
             <span className="chip chip--stage">{t("join.pinChip", { pin })}</span>
           </>
         ) : undefined

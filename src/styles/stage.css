@@ -1127,3 +1127,26 @@ li[data-duplicate] {
   border-radius: var(--radius-md);
   box-shadow: 0 20px 40px -24px color-mix(in srgb, var(--color-primary) 60%, transparent);
 }
+
+/* ---------- ses aç/kapa ---------- */
+.chip--sound {
+  padding: 6px 10px;
+  color: var(--stage-soft);
+  cursor: pointer;
+  font: inherit;
+}
+
+.chip--sound[aria-pressed="true"] {
+  color: var(--color-on-stage);
+}
+
+.chip--sound svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

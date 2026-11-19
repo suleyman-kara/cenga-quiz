@@ -126,6 +126,7 @@ export const en = {
   "hostGame.lobbyLocked": "Lobby locked: no new players",
   "hostGame.playersOfMax": "{count} / {max} players",
   "hostGame.lobbyFull": "Lobby full",
+  "hostGame.sound": "Sound effects",
   "hostGame.wakeLock": "Keeping the screen on",
   "hostGame.playersPanel": "Players ({count})",
   "hostGame.getReady": "Get ready!",

@@ -129,6 +129,7 @@ export const tr: Messages = {
   "hostGame.playersOfMax": "{count} / {max} oyuncu",
   "hostGame.lobbyFull": "Lobi dolu",
   "hostGame.wakeLock": "Ekran açık tutuluyor",
+  "hostGame.sound": "Ses efektleri",
   "hostGame.playersPanel": "Oyuncular ({count})",
   "hostGame.getReady": "Hazır olun!",
   "errors.tooManyRequests": "Çok fazla katılım isteği; mobil veriye geçip tekrar dene.",

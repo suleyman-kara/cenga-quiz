@@ -83,6 +83,20 @@ describe("HostGame", () => {
     expect(hostCall).toHaveBeenCalledWith("startGame", { pin: "123456" });
   });
 
+  it("has a sound toggle that remembers the choice", async () => {
+    localStorage.removeItem("stage-sound-muted");
+    const { unmount } = renderHost();
+    const btn = screen.getByRole("button", { name: t("hostGame.sound") });
+    expect(btn).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(btn);
+    expect(btn).toHaveAttribute("aria-pressed", "false");
+    expect(localStorage.getItem("stage-sound-muted")).toBe("1");
+    unmount();
+    renderHost();
+    expect(screen.getByRole("button", { name: t("hostGame.sound") })).toHaveAttribute("aria-pressed", "false");
+    localStorage.removeItem("stage-sound-muted");
+  });
+
   it("lobby: shows a QR code that opens the join page with the PIN", () => {
     renderHost();
     const qr = screen.getByRole("img", { name: t("hostGame.qrLabel") });
