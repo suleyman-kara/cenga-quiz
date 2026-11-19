@@ -90,6 +90,11 @@ export interface ClubConfig {
     maxPlayers: number;
     /** Bu kadar saat hareketsiz kalan odalar zamanlanmış görevle kapatılır */
     abandonedAfterHours: number;
+    /**
+     * Soru metni telefonlara bu kadar ms önce gönderilir; süre (ve cevap kabulü) ancak sonra başlar.
+     * Ağ gecikmesi farklı oyuncular arasında adaletsizlik yaratmasın diye.
+     */
+    leadInMs: number;
     /** Oyun sonuçları (gameResults) bu kadar gün sonra Firestore TTL ile silinir (expireAt alanı) */
     resultsRetentionDays: number;
   };
@@ -186,6 +191,7 @@ export const club: ClubConfig = {
     leaderboardSize: 5,
     maxPlayers: 300,
     abandonedAfterHours: 6,
+    leadInMs: 3000,
     resultsRetentionDays: 365,
   },
 };

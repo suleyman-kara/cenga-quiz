@@ -7,6 +7,7 @@ export const config: GameConfig = {
   streakBonus: { enabled: true, perStreak: 100, max: 500 },
   leaderboardSize: 2,
   maxPlayers: 3,
+  leadInMs: 0,
 };
 
 export const quiz: Quiz = {

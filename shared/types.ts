@@ -106,7 +106,11 @@ export interface GameState {
   phase: Phase;
   /** -1 in lobby */
   qIndex: number;
-  /** server ms; 0 when not in a question */
+  /**
+   * server ms when the question clock starts; 0 when not in a question. During a question it is
+   * club.game.leadInMs AFTER the question was published (updatedAt): show a "get ready" countdown
+   * until startedAt — answers are rejected before it. Scoring uses answer.at - startedAt.
+   */
   startedAt: number;
   endsAt: number;
   updatedAt: number;

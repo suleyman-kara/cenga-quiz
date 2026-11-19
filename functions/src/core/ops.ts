@@ -59,7 +59,7 @@ export function planStart(room: Room | null | undefined, ctx: OpContext): Patch 
   for (const [uid, name] of Object.entries(sanitizePlayerNames(keptPlayers, ctx.namePrefix ?? "Oyuncu"))) {
     patch[`players/${uid}/name`] = name;
   }
-  return { ...patch, ...questionPatch(quiz, 0, ctx.now, ctx.config.defaultQuestionSeconds) };
+  return { ...patch, ...questionPatch(quiz, 0, ctx.now, ctx.config.defaultQuestionSeconds, ctx.config.leadInMs) };
 }
 
 export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch {
@@ -101,7 +101,7 @@ export function planNext(room: Room | null | undefined, ctx: OpContext): Patch {
   const quiz = needQuiz(ctx);
   const next = r.state.qIndex + 1;
   if (next >= quiz.questions.length) throw new GameError("failed-precondition", "Başka soru kalmadı.");
-  return questionPatch(quiz, next, ctx.now, ctx.config.defaultQuestionSeconds);
+  return questionPatch(quiz, next, ctx.now, ctx.config.defaultQuestionSeconds, ctx.config.leadInMs);
 }
 
 export function planEnd(room: Room | null | undefined, ctx: OpContext): Patch {

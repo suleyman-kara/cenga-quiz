@@ -18,6 +18,8 @@ export interface GameConfig {
   streakBonus: { enabled: boolean; perStreak: number; max: number };
   leaderboardSize: number;
   maxPlayers: number;
+  /** question published this long before its clock starts (state.startedAt) */
+  leadInMs: number;
 }
 
 /** games/{pin} as read from RTDB (every node optional). */
@@ -112,14 +114,18 @@ export function publicQuestion(quiz: Quiz, index: number, defaultSeconds: number
   return pq;
 }
 
-/** One multi-path update that shows question `index`. */
-export function questionPatch(quiz: Quiz, index: number, now: number, defaultSeconds: number): Patch {
+/**
+ * One multi-path update that shows question `index`. The question is published now; the clock
+ * (and answer acceptance, see rules) starts `leadInMs` later so every phone has it first.
+ */
+export function questionPatch(quiz: Quiz, index: number, now: number, defaultSeconds: number, leadInMs = 0): Patch {
   const question = publicQuestion(quiz, index, defaultSeconds);
+  const startedAt = now + Math.max(0, leadInMs);
   const state: GameState = {
     phase: "question",
     qIndex: index,
-    startedAt: now,
-    endsAt: now + question.seconds * 1000,
+    startedAt,
+    endsAt: startedAt + question.seconds * 1000,
     updatedAt: now,
   };
   return { question, reveal: null, state };
