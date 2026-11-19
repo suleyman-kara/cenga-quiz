@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Canlı quiz dosyası",
+  "description": "Sunucu panelindeki 'JSON'dan quiz içe aktar' ile yüklenen quiz biçimi. Limitler shared/quizValidate.ts (QUIZ_LIMITS) ile aynıdır; shared/quizSchema.test.ts bunu denetler. Asıl doğrulama uygulamadadır: metinler kırpılır, bilinmeyen alanlar atılır, şıkların büyük/küçük harf duyarsız olarak farklı olması ve 'correct' değerinin şık sayısından küçük olması ayrıca kontrol edilir.",
+  "type": "object",
+  "required": ["title", "questions"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Editör desteği için bu şemanın yolu, ör. ./quiz.schema.json"
+    },
+    "title": {
+      "type": "string",
+      "description": "Quiz başlığı.",
+      "minLength": 1,
+      "maxLength": 120,
+      "pattern": "\\S"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "İsteğe bağlı kısa açıklama.",
+      "maxLength": 500
+    },
+    "questions": {
+      "type": "array",
+      "description": "Sorular, gösterilecekleri sırayla.",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/question" }
+    }
+  },
+  "$defs": {
+    "question": {
+      "type": "object",
+      "required": ["text", "options", "correct"],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Soru metni.",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "\\S"
+        },
+        "options": {
+          "type": "array",
+          "description": "2-4 şık. Sıra, ekrandaki şık şekillerinin sırasıdır.",
+          "minItems": 2,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "pattern": "\\S"
+          }
+        },
+        "correct": {
+          "type": "integer",
+          "description": "Doğru şıkkın 0'dan başlayan indeksi; şık sayısından küçük olmalı.",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "seconds": {
+          "type": ["integer", "null"],
+          "description": "Cevap süresi (saniye). Verilmezse kulüp ayarındaki varsayılan kullanılır.",
+          "minimum": 5,
+          "maximum": 120
+        },
+        "imageUrl": {
+          "type": ["string", "null"],
+          "description": "İsteğe bağlı görsel; https:// ile başlayan adres.",
+          "maxLength": 2048,
+          "pattern": "^\\s*(https://[^\\s/?#]+[^\\s]*)?\\s*$"
+        }
+      }
+    }
+  }
+}

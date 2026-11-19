@@ -54,7 +54,7 @@ function optString(v: unknown, path: string, max: number, errors: string[]): str
   return t;
 }
 
-const IMAGE_URL_MAX = 2048;
+export const IMAGE_URL_MAX = 2048;
 
 function isHttpsUrl(s: string): boolean {
   if (/\s/.test(s)) return false;
