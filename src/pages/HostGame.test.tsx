@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { GameState, PublicQuestion } from "../../shared/types";
@@ -7,9 +7,10 @@ import { translate } from "../i18n";
 import { club } from "../club.config";
 import { HostGame } from "./HostGame";
 import * as hooks from "../game/hooks";
-import { call } from "../firebase";
+import { hostCall } from "../firebase";
 
-vi.mock("../firebase", () => ({ call: vi.fn() }));
+vi.mock("../firebase", () => ({ hostCall: vi.fn() }));
+vi.mock("../game/connection", () => ({ useConnectionLost: () => false }));
 vi.mock("../game/host", () => ({
   useHostAuth: () => ({
     status: "authorized",
@@ -38,24 +39,31 @@ const t = (k: Parameters<typeof translate>[1], v?: Record<string, string | numbe
 const qState = (qIndex = 0): GameState => ({ phase: "question", qIndex, startedAt: 0, endsAt: 20_000, updatedAt: 0 });
 const question = (index = 0): PublicQuestion => ({ index, text: "Başkent?", options: ["İzmir", "Ankara"], seconds: 20 });
 const players = (n: number) => Array.from({ length: n }, (_, i) => ({ uid: `u${i}`, name: `Oyuncu ${i}`, joinedAt: i }));
+const meta = (p: Partial<{ locked: boolean }> = {}) => ({
+  hostUid: "h1",
+  quizId: "q",
+  title: "Genel kültür",
+  createdAt: 0,
+  questionCount: 3,
+  ...p,
+});
 
-function renderHost() {
-  return render(
-    <MemoryRouter initialEntries={["/host/game/123456"]}>
-      <Routes>
-        <Route path="/host/game/:pin" element={<HostGame />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
+const ui = () => (
+  <MemoryRouter initialEntries={["/host/game/123456"]}>
+    <Routes>
+      <Route path="/host/game/:pin" element={<HostGame />} />
+    </Routes>
+  </MemoryRouter>
+);
+const renderHost = () => render(ui());
 
-const revealCalls = () => vi.mocked(call).mock.calls.filter(([name]) => name === "reveal");
+const callsOf = (action: string) => vi.mocked(hostCall).mock.calls.filter(([a]) => a === action);
 
 describe("HostGame", () => {
   beforeEach(() => {
-    vi.mocked(call).mockReset().mockResolvedValue({ ok: true });
-    vi.mocked(hooks.useMeta).mockReturnValue({ hostUid: "h1", quizId: "q", title: "Genel kültür", createdAt: 0, questionCount: 3 });
+    vi.mocked(hostCall).mockReset().mockResolvedValue({ ok: true } as never);
     vi.mocked(hooks.useGameState).mockReturnValue({ phase: "lobby", qIndex: -1, startedAt: 0, endsAt: 0, updatedAt: 0 });
+    vi.mocked(hooks.useMeta).mockReturnValue(meta());
     vi.mocked(hooks.useQuestion).mockReturnValue(null);
     vi.mocked(hooks.useReveal).mockReturnValue(null);
     vi.mocked(hooks.useLeaderboard).mockReturnValue(null);
@@ -64,7 +72,7 @@ describe("HostGame", () => {
     vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
   });
 
-  it("lobby: shows the PIN, join URL, player names and count; Start calls startGame", async () => {
+  it("lobby: shows the PIN, join URL, player names and count; Start calls the host dispatcher", async () => {
     renderHost();
     expect(screen.getByText("123456")).toBeInTheDocument();
     expect(screen.getByText(new RegExp(window.location.host.replace(/[.:]/g, "\\$&")))).toBeInTheDocument();
@@ -72,13 +80,37 @@ describe("HostGame", () => {
     expect(screen.getByText("Oyuncu 1")).toBeInTheDocument();
     expect(screen.getByText(t("hostGame.players", { count: 2 }))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.start") }));
-    expect(call).toHaveBeenCalledWith("startGame", { pin: "123456" });
+    expect(hostCall).toHaveBeenCalledWith("startGame", { pin: "123456" });
   });
 
   it("lobby: Start is disabled without players", () => {
     vi.mocked(hooks.usePlayers).mockReturnValue([]);
     renderHost();
     expect(screen.getByRole("button", { name: t("hostGame.start") })).toBeDisabled();
+  });
+
+  it("lobby: × removes a player after confirmation", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    renderHost();
+    const kick = screen.getByRole("button", { name: t("hostGame.kick", { name: "Oyuncu 1" }) });
+    await userEvent.click(kick);
+    expect(callsOf("kickPlayer")).toHaveLength(0);
+    await userEvent.click(kick);
+    expect(confirm).toHaveBeenLastCalledWith(t("hostGame.kickConfirm", { name: "Oyuncu 1" }));
+    expect(hostCall).toHaveBeenCalledWith("kickPlayer", { pin: "123456", uid: "u1" });
+    confirm.mockRestore();
+  });
+
+  it("lobby: lock toggle calls setLobbyLocked and shows the locked state", async () => {
+    const { unmount } = renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.lockLobby") }));
+    expect(hostCall).toHaveBeenCalledWith("setLobbyLocked", { pin: "123456", locked: true });
+    unmount();
+    vi.mocked(hooks.useMeta).mockReturnValue(meta({ locked: true }));
+    renderHost();
+    expect(screen.getByText(t("hostGame.lobbyLocked"))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.unlockLobby") }));
+    expect(hostCall).toHaveBeenCalledWith("setLobbyLocked", { pin: "123456", locked: false });
   });
 
   it("question: shows text, options and x / y answered; no reveal while time remains", () => {
@@ -90,39 +122,46 @@ describe("HostGame", () => {
     expect(screen.getByText("Ankara")).toBeInTheDocument();
     expect(screen.getByText(t("hostGame.answered", { answered: 1, total: 2 }))).toBeInTheDocument();
     expect(hooks.useAnswerCount).toHaveBeenCalledWith("123456", 0);
-    expect(revealCalls()).toHaveLength(0);
+    expect(callsOf("reveal")).toHaveLength(0);
   });
 
-  it("auto-reveals exactly once when time is up", async () => {
-    vi.mocked(hooks.useGameState).mockReturnValue(qState());
+  it("lead-in: before startedAt the stage says 'get ready' with a countdown instead of the timer", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), startedAt: 8_000, endsAt: 28_000 });
     vi.mocked(hooks.useQuestion).mockReturnValue(question());
-    vi.mocked(hooks.useServerNow).mockReturnValue(20_500);
-    const { rerender } = renderHost();
-    await waitFor(() => expect(revealCalls()).toHaveLength(1));
-    expect(revealCalls()[0][1]).toEqual({ pin: "123456" });
-    vi.mocked(hooks.useServerNow).mockReturnValue(21_500);
-    rerender(
-      <MemoryRouter initialEntries={["/host/game/123456"]}>
-        <Routes>
-          <Route path="/host/game/:pin" element={<HostGame />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    await new Promise((r) => setTimeout(r, 20));
-    expect(revealCalls()).toHaveLength(1);
+    renderHost();
+    expect(screen.getByText(t("hostGame.getReady"))).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
-  it("auto-reveals exactly once when all players answered", async () => {
+  it("auto-reveals once, 300 ms after endsAt (server clock), with the expected qIndex", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState(1));
+    vi.mocked(hooks.useQuestion).mockReturnValue(question(1));
+    vi.mocked(hooks.useServerNow).mockReturnValue(20_299);
+    const { rerender } = renderHost();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(callsOf("reveal")).toHaveLength(0);
+    vi.mocked(hooks.useServerNow).mockReturnValue(20_300);
+    rerender(ui());
+    await waitFor(() => expect(callsOf("reveal")).toHaveLength(1));
+    expect(callsOf("reveal")[0][1]).toEqual({ pin: "123456", qIndex: 1 });
+    vi.mocked(hooks.useServerNow).mockReturnValue(21_500);
+    rerender(ui());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(callsOf("reveal")).toHaveLength(1);
+  });
+
+  it("auto-reveals exactly once when all players answered; {already:true} is success", async () => {
+    vi.mocked(hostCall).mockResolvedValue({ ok: true, already: true } as never);
     vi.mocked(hooks.useGameState).mockReturnValue(qState());
     vi.mocked(hooks.useQuestion).mockReturnValue(question());
     vi.mocked(hooks.useAnswerCount).mockReturnValue(2);
     renderHost();
-    await waitFor(() => expect(revealCalls()).toHaveLength(1));
-    // manual button afterwards must not double-call
-    const btn = screen.getByRole("button", { name: t("hostGame.reveal") });
-    expect(btn).toBeDisabled();
+    await waitFor(() => expect(callsOf("reveal")).toHaveLength(1));
+    expect(screen.getByRole("button", { name: t("hostGame.reveal") })).toBeDisabled();
     await new Promise((r) => setTimeout(r, 20));
-    expect(revealCalls()).toHaveLength(1);
+    expect(callsOf("reveal")).toHaveLength(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("manual Reveal calls reveal once and prevents a later auto-reveal", async () => {
@@ -130,27 +169,33 @@ describe("HostGame", () => {
     vi.mocked(hooks.useQuestion).mockReturnValue(question());
     const { rerender } = renderHost();
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.reveal") }));
-    expect(revealCalls()).toHaveLength(1);
+    expect(callsOf("reveal")).toHaveLength(1);
     vi.mocked(hooks.useServerNow).mockReturnValue(25_000);
-    rerender(
-      <MemoryRouter initialEntries={["/host/game/123456"]}>
-        <Routes>
-          <Route path="/host/game/:pin" element={<HostGame />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    rerender(ui());
     await new Promise((r) => setTimeout(r, 20));
-    expect(revealCalls()).toHaveLength(1);
+    expect(callsOf("reveal")).toHaveLength(1);
   });
 
-  it("shows the callable error message", async () => {
-    vi.mocked(call).mockRejectedValue(new Error("boom"));
+  it("shows the server's message for a refused action", async () => {
+    vi.mocked(hostCall).mockRejectedValue(
+      Object.assign(new Error("Başlatmak için en az bir oyuncu gerekli."), { code: "functions/permission-denied" }),
+    );
     renderHost();
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.start") }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("boom");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Başlatmak için en az bir oyuncu gerekli.");
   });
 
-  it("reveal: shows the distribution counts and a button to the leaderboard", async () => {
+  it("retries once after lock contention (failed-precondition)", async () => {
+    vi.mocked(hostCall)
+      .mockRejectedValueOnce(Object.assign(new Error("Başka bir işlem sürüyor"), { code: "functions/failed-precondition" }))
+      .mockResolvedValue({ ok: true } as never);
+    renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.start") }));
+    await waitFor(() => expect(callsOf("startGame")).toHaveLength(2), { timeout: 2000 });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("reveal: shows the distribution counts and a button to the leaderboard (with qIndex)", async () => {
     vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), phase: "reveal" });
     vi.mocked(hooks.useQuestion).mockReturnValue(question());
     vi.mocked(hooks.useReveal).mockReturnValue({ qIndex: 0, correct: 1, counts: [4, 7] });
@@ -159,10 +204,10 @@ describe("HostGame", () => {
     expect(screen.getByText("7")).toBeInTheDocument();
     expect(screen.getByText("Ankara").closest("[data-correct]")).toHaveAttribute("data-correct", "true");
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.showLeaderboard") }));
-    expect(call).toHaveBeenCalledWith("showLeaderboard", { pin: "123456" });
+    expect(hostCall).toHaveBeenCalledWith("showLeaderboard", { pin: "123456", qIndex: 0 });
   });
 
-  it("leaderboard: shows top 5 and Next; last question offers End", async () => {
+  it("leaderboard: shows top 5 and Next (with qIndex); last question offers End", async () => {
     vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "leaderboard" });
     vi.mocked(hooks.useLeaderboard).mockReturnValue({
       top: [
@@ -175,14 +220,32 @@ describe("HostGame", () => {
     expect(screen.getByText("Ali")).toBeInTheDocument();
     expect(screen.getByText("Veli")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.next") }));
-    expect(call).toHaveBeenCalledWith("nextQuestion", { pin: "123456" });
+    expect(hostCall).toHaveBeenCalledWith("nextQuestion", { pin: "123456", qIndex: 0 });
     unmount();
 
     vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(2), phase: "leaderboard" });
     renderHost();
     expect(screen.queryByRole("button", { name: t("hostGame.next") })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.end") }));
-    expect(call).toHaveBeenCalledWith("endGame", { pin: "123456" });
+    expect(hostCall).toHaveBeenCalledWith("endGame", { pin: "123456" });
+  });
+
+  it("mid-game: the players panel can remove a player", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "leaderboard" });
+    renderHost();
+    const panel = screen.getByText(t("hostGame.playersPanel", { count: 2 })).closest("details")!;
+    await userEvent.click(within(panel).getByText(t("hostGame.playersPanel", { count: 2 })));
+    await userEvent.click(within(panel).getByRole("button", { name: t("hostGame.kick", { name: "Oyuncu 0" }) }));
+    expect(hostCall).toHaveBeenCalledWith("kickPlayer", { pin: "123456", uid: "u0" });
+    confirm.mockRestore();
+  });
+
+  it("shows a 'calculating' hint while a transition holds the lock", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), phase: "reveal", lock: { by: "showLeaderboard", at: 4_800 } });
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    renderHost();
+    expect(screen.getByText(t("common.computing"))).toBeInTheDocument();
   });
 
   it("ended: podium with top 3, club final text and logo", () => {
@@ -204,3 +267,4 @@ describe("HostGame", () => {
     expect(screen.getByAltText(club.logo.alt)).toBeInTheDocument();
   });
 });
+

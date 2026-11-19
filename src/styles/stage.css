@@ -791,3 +791,174 @@
     font-size: 2rem;
   }
 }
+
+/* ---------- moderation: kick buttons, lock state, players panel ---------- */
+.kick-btn {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 2px;
+  margin-right: -8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--stage-soft);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.kick-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.kick-btn:hover:not(:disabled),
+.kick-btn:focus-visible {
+  opacity: 1;
+  background: var(--color-danger);
+  color: var(--color-on-primary);
+}
+
+.kick-btn:disabled {
+  cursor: default;
+  opacity: 0.25;
+}
+
+.stage-lobby__ticket[data-locked] {
+  opacity: 0.6;
+}
+
+.stage-lobby__locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-danger) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 60%, transparent);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.stage-lobby__locked svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.stage-panel {
+  align-self: flex-start;
+  position: relative;
+  z-index: 2;
+  max-width: min(420px, 100%);
+  background: var(--stage-panel);
+  border: 1px solid var(--stage-line);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  font-size: 1rem;
+}
+
+.stage-panel summary {
+  cursor: pointer;
+  color: var(--stage-soft);
+  font-weight: 600;
+}
+
+.stage-panel__list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stage-panel__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0 2px 4px;
+  border-bottom: 1px solid var(--stage-line);
+}
+
+.stage-panel__list .kick-btn {
+  margin-right: 0;
+}
+
+/* ---------- lead-in, computing hint, wake-lock indicator ---------- */
+.stage-getready {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.stage-getready__title {
+  font: 700 clamp(1.2rem, 2vw, 1.8rem) / 1 var(--font-heading);
+  color: var(--stage-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stage-getready__num {
+  font: 800 clamp(4rem, 9vw, 8rem) / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  animation: getready-pulse 1s ease-in-out infinite;
+}
+
+@keyframes getready-pulse {
+  0% {
+    transform: scale(1.15);
+  }
+  40% {
+    transform: none;
+  }
+}
+
+.stage-options[data-leadin] .stage-option {
+  opacity: 0.45;
+}
+
+.stage__computing {
+  align-self: center;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--stage-panel);
+  border: 1px solid var(--stage-line);
+  color: var(--stage-soft);
+}
+
+.chip--awake {
+  padding: 6px 10px;
+  color: var(--stage-soft);
+}
+
+.chip--awake svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-getready__num {
+    animation: none;
+  }
+}
