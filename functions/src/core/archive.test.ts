@@ -1,0 +1,53 @@
+import { describe, it, expect } from "vitest";
+import { buildGameResult, hasScores } from "./archive";
+import { lobbyRoom } from "./fixtures";
+import type { Room } from "./room";
+
+const s = (score: number, correctCount: number) => ({
+  score,
+  streak: 0,
+  rank: 0,
+  lastDelta: 0,
+  lastCorrect: false,
+  lastAnswered: false,
+  correctCount,
+});
+
+describe("buildGameResult", () => {
+  it("builds a GameResultDoc with results sorted by rank (ties share rank)", () => {
+    const room: Room = {
+      ...lobbyRoom({ p1: "Ali", p2: "Ayşe", p3: "Can", p4: "Deniz" }),
+      scores: { p1: s(500, 1), p2: s(1500, 2), p3: s(500, 1) },
+    };
+    const doc = buildGameResult(room, { pin: "123456", now: 9999 });
+    expect(doc).toEqual({
+      pin: "123456",
+      hostUid: "host",
+      quizId: "q1",
+      title: "Deneme",
+      createdAt: 1000,
+      endedAt: 9999,
+      playerCount: 4,
+      questionCount: 2,
+      results: [
+        { uid: "p2", name: "Ayşe", score: 1500, rank: 1, correctCount: 2 },
+        { uid: "p1", name: "Ali", score: 500, rank: 2, correctCount: 1 },
+        { uid: "p3", name: "Can", score: 500, rank: 2, correctCount: 1 },
+        { uid: "p4", name: "Deniz", score: 0, rank: 4, correctCount: 0 },
+      ],
+    });
+  });
+
+  it("handles a room without players", () => {
+    const doc = buildGameResult(lobbyRoom({}), { pin: "123456", now: 1 });
+    expect(doc.results).toEqual([]);
+    expect(doc.playerCount).toBe(0);
+  });
+});
+
+describe("hasScores", () => {
+  it("is true only when some score node exists", () => {
+    expect(hasScores(lobbyRoom())).toBe(false);
+    expect(hasScores({ ...lobbyRoom(), scores: { p1: s(0, 0) } })).toBe(true);
+  });
+});
