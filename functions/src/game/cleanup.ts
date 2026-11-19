@@ -1,0 +1,50 @@
+/** Scheduled housekeeping core — plain async so tests can call it directly. */
+import { club } from "../../../src/club.config";
+import { buildGameResult } from "../core/archive";
+import { classifyRoom, type CleanupOptions } from "../core/cleanup";
+import type { Room } from "../core/room";
+import { database, firestore } from "./firebase";
+
+const MIN = 60_000;
+
+export const cleanupOptions: CleanupOptions = {
+  endedGraceMs: 30 * MIN,
+  abandonedMs: club.game.abandonedAfterHours * 60 * MIN,
+};
+
+export interface CleanupSummary {
+  removed: number;
+  archived: number;
+  orphanSnapshots: number;
+}
+
+export async function runCleanup(now: number, opts: CleanupOptions = cleanupOptions): Promise<CleanupSummary> {
+  const [db, fs] = await Promise.all([database(), firestore()]);
+  const summary: CleanupSummary = { removed: 0, archived: 0, orphanSnapshots: 0 };
+
+  // A club runs only a handful of rooms at once, so reading them all is fine and needs no index.
+  const snap = await db.ref("games").get();
+  const rooms = (snap.val() ?? {}) as Record<string, Room | null>;
+
+  for (const [pin, room] of Object.entries(rooms)) {
+    const action = classifyRoom(room, now, opts);
+    if (action === "keep") continue;
+    if (action === "archive-remove") {
+      await fs.collection("gameResults").add(buildGameResult(room!, { pin, now }));
+      summary.archived++;
+    }
+    await Promise.all([db.ref(`games/${pin}`).remove(), fs.doc(`liveGames/${pin}`).delete()]);
+    summary.removed++;
+  }
+
+  // Private snapshots whose room no longer exists (e.g. a half-finished createGame).
+  const stale = await fs.collection("liveGames").where("createdAt", "<", now - opts.abandonedMs).get();
+  for (const doc of stale.docs) {
+    const exists = (await db.ref(`games/${doc.id}/meta`).get()).exists();
+    if (!exists) {
+      await doc.ref.delete();
+      summary.orphanSnapshots++;
+    }
+  }
+  return summary;
+}
