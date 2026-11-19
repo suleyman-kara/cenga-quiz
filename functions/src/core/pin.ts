@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { GameError } from "./errors";
 
 /**
@@ -14,4 +15,9 @@ export async function allocatePin(
     if (await tryClaim(pin)) return pin;
   }
   throw new GameError("resource-exhausted", "Boş bir oyun PIN'i bulunamadı, lütfen tekrar deneyin.");
+}
+
+/** Six-digit PIN from the CSPRNG (PINs are the only thing standing between strangers and a lobby). */
+export function securePin(rand: (min: number, max: number) => number = randomInt): string {
+  return String(rand(100000, 1000000));
 }

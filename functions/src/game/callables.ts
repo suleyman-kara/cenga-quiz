@@ -1,12 +1,11 @@
 import type { CallableContract, GameMeta, LiveGameDoc, LockAction, QuizDoc } from "../../../shared/types";
 import { validateQuiz } from "../../../shared/quizValidate";
-import { generatePin } from "../../../shared/pin";
 import { club } from "../../../src/club.config";
 import type { AuthLike } from "../core/auth";
 import { parseBool, parsePin, parseQuizId, parseUid } from "../core/auth";
 import { busyError, isLockActive } from "../core/lock";
 import { GameError } from "../core/errors";
-import { allocatePin } from "../core/pin";
+import { allocatePin, securePin } from "../core/pin";
 import { applyPatch, newRoom, type GameConfig, type Patch, type Room } from "../core/room";
 import {
   guard,
@@ -63,7 +62,7 @@ export async function createGame(auth: AuthLike | undefined, data: unknown): Res
       .ref(`games/${candidate}`)
       .transaction((cur: Room | null) => (cur === null ? newRoom(meta, now) : undefined), undefined, false);
     return res.committed;
-  }, generatePin);
+  }, securePin);
 
   const live: LiveGameDoc = { pin, hostUid: uid, quizId, quiz: v.quiz, createdAt: now };
   try {
