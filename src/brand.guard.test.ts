@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { club } from "./club.config";
 
 const ROOT = join(__dirname, "..");
@@ -12,6 +12,9 @@ const SCAN_DIRS = ["src", "shared", "functions/src", "rules", "scripts", "tests"
 const SCAN_FILES = ["index.html", "firebase.json", "package.json"];
 const ALLOWED = new Set(["src/club.config.ts"]);
 const EXT = /\.(ts|tsx|js|mjs|json|html|css|rules)$/;
+
+/** Platformdan bağımsız (Windows'ta da "/" ile) göreli yol. */
+const rel = (f: string) => relative(ROOT, f).split(sep).join("/");
 
 function walk(dir: string): string[] {
   let out: string[] = [];
@@ -33,7 +36,7 @@ function walk(dir: string): string[] {
 const files = [
   ...SCAN_DIRS.flatMap((d) => walk(join(ROOT, d))),
   ...SCAN_FILES.map((f) => join(ROOT, f)),
-].filter((f) => !ALLOWED.has(relative(ROOT, f)) && !f.endsWith("brand.guard.test.ts"));
+].filter((f) => !ALLOWED.has(rel(f)) && !f.endsWith("brand.guard.test.ts"));
 
 // Encoded so that the names themselves never appear in the repository.
 const BANNED = ["S2Fob290", "UXVpemxldA==", "TWVudGltZXRlcg=="].map((b) =>
@@ -51,7 +54,7 @@ describe("brand guard", () => {
       const text = readFileSync(f, "utf8").toLowerCase();
       return needles.some((n) => text.includes(n));
     });
-    expect(offenders.map((f) => relative(ROOT, f))).toEqual([]);
+    expect(offenders.map(rel)).toEqual([]);
   });
 
   it("no other quiz product names appear in the code", () => {
@@ -59,6 +62,6 @@ describe("brand guard", () => {
       const text = readFileSync(f, "utf8").toLowerCase();
       return BANNED.some((n) => text.includes(n));
     });
-    expect(offenders.map((f) => relative(ROOT, f))).toEqual([]);
+    expect(offenders.map(rel)).toEqual([]);
   });
 });
