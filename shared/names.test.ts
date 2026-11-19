@@ -74,14 +74,14 @@ describe("isValidName", () => {
     "a<b",
     "a@b",
     "naïve", // ï not allowed
-    "Ali\tVeli",
     "ab/cd",
   ])("rejects %j", (n) => {
     expect(isValidName(n)).toBe(false);
   });
 
-  it("validates the normalized form (so surrounding/inner extra spaces are fine)", () => {
+  it("validates the normalized form (so surrounding/inner extra whitespace is fine)", () => {
     expect(isValidName("  Ali    Veli ")).toBe(true);
+    expect(isValidName("Ali\tVeli")).toBe(true);
   });
 
   it("rejects names that are too long even after normalization", () => {
