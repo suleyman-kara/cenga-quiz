@@ -858,7 +858,8 @@
 }
 
 .stage-panel {
-  align-self: flex-start;
+  align-self: center;
+  margin-right: auto;
   position: relative;
   z-index: 2;
   max-width: min(420px, 100%);
@@ -875,11 +876,20 @@
   font-weight: 600;
 }
 
+/* opens upwards over the stage so the control row keeps its height */
 .stage-panel__list {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 260px;
   list-style: none;
-  margin: 8px 0 0;
-  padding: 0;
-  max-height: 40vh;
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--color-stage);
+  border: 1px solid var(--stage-line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  max-height: 50vh;
   overflow: auto;
   display: flex;
   flex-direction: column;

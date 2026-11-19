@@ -132,6 +132,7 @@ describe("HostGame", () => {
     expect(screen.getByText(t("hostGame.getReady"))).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: t("hostGame.reveal") })).toBeDisabled();
   });
 
   it("auto-reveals once, 300 ms after endsAt (server clock), with the expected qIndex", async () => {

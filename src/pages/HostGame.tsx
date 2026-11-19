@@ -144,7 +144,12 @@ function BigScreen({ pin }: { pin: string }) {
           />
         );
         controls = (
-          <button type="button" className="btn btn--primary btn--stage" disabled={auto.sent} onClick={auto.reveal}>
+          <button
+            type="button"
+            className="btn btn--primary btn--stage"
+            disabled={auto.sent || !started}
+            onClick={auto.reveal}
+          >
             {t("hostGame.reveal")}
           </button>
         );
@@ -254,13 +259,17 @@ function BigScreen({ pin }: { pin: string }) {
           </p>
         )}
         <div className="stage__body">{body}</div>
-        {midGame && <PlayersPanel players={players} onKick={kick} busy={busy} />}
         {error && (
           <p className="stage__error" role="alert">
             {error}
           </p>
         )}
-        {controls && <div className="stage__controls">{controls}</div>}
+        {(controls || midGame) && (
+          <div className="stage__controls">
+            {midGame && <PlayersPanel players={players} onKick={kick} busy={busy} />}
+            {controls}
+          </div>
+        )}
       </div>
     </Layout>
   );
