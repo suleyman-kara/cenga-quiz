@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { GameState, PublicQuestion } from "../../shared/types";
@@ -99,6 +99,45 @@ describe("HostGame", () => {
     renderHost();
     expect(screen.getByRole("button", { name: t("hostGame.sound") })).toHaveAttribute("aria-pressed", "false");
     localStorage.removeItem("stage-sound-muted");
+  });
+
+  it("lobby: a 'sound is off' banner shows while muted and turns the sound back on", async () => {
+    localStorage.setItem("stage-sound-muted", "1");
+    renderHost();
+    const banner = screen.getByRole("button", { name: t("hostGame.soundOff") });
+    await userEvent.click(banner);
+    expect(screen.queryByRole("button", { name: t("hostGame.soundOff") })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: t("hostGame.sound") })).toHaveAttribute("aria-pressed", "true");
+    expect(localStorage.getItem("stage-sound-muted")).toBeNull();
+  });
+
+  it("no 'sound is off' banner outside the lobby", () => {
+    localStorage.setItem("stage-sound-muted", "1");
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), phase: "reveal" });
+    renderHost();
+    expect(screen.queryByRole("button", { name: t("hostGame.soundOff") })).not.toBeInTheDocument();
+    localStorage.removeItem("stage-sound-muted");
+  });
+
+  it("has separate music and effects volume sliders next to the sound toggle, remembered", async () => {
+    localStorage.removeItem("stage-sound-levels");
+    const { unmount } = renderHost();
+    const open = screen.getByRole("button", { name: t("hostGame.soundVolume") });
+    expect(open).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(open);
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    const music = screen.getByRole("slider", { name: t("hostGame.musicVolume") });
+    const sfx = screen.getByRole("slider", { name: t("hostGame.sfxVolume") });
+    expect(Number((music as HTMLInputElement).value)).toBeLessThan(Number((sfx as HTMLInputElement).value));
+    fireEvent.change(music, { target: { value: "20" } });
+    expect(JSON.parse(localStorage.getItem("stage-sound-levels") ?? "{}").music).toBeCloseTo(0.2);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("slider", { name: t("hostGame.musicVolume") })).not.toBeInTheDocument();
+    unmount();
+    renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.soundVolume") }));
+    expect(screen.getByRole("slider", { name: t("hostGame.musicVolume") })).toHaveValue("20");
+    localStorage.removeItem("stage-sound-levels");
   });
 
   it("lobby: shows a QR code that opens the join page with the PIN", () => {

@@ -300,6 +300,36 @@ describe("PlayerGame", () => {
     delete (navigator as unknown as { vibrate?: unknown }).vibrate;
   });
 
+  it("reveal: a short double buzz when correct, one longer buzz when wrong, none without an answer", () => {
+    const vibrate = vi.fn();
+    Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    const first = renderPlay();
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    const correctPattern = vibrate.mock.calls[0][0] as number[];
+    expect(Array.isArray(correctPattern)).toBe(true);
+    first.unmount();
+
+    vibrate.mockClear();
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ lastCorrect: false, lastDelta: 0, streak: 0 }));
+    const second = renderPlay();
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate.mock.calls[0][0]).not.toEqual(correctPattern);
+    second.unmount();
+
+    vibrate.mockClear();
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ lastCorrect: false, lastAnswered: false, lastDelta: 0 }));
+    renderPlay();
+    expect(vibrate).not.toHaveBeenCalled();
+    delete (navigator as unknown as { vibrate?: unknown }).vibrate;
+  });
+
+  it("reveal: no vibration API, no problem", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    expect(() => renderPlay()).not.toThrow();
+    expect(screen.getByText(t("player.correct"))).toBeInTheDocument();
+  });
+
   it("lead-in: before startedAt shows 'get ready' with a countdown and no options yet", () => {
     vi.mocked(hooks.useGameState).mockReturnValue({ ...state("question"), startedAt: 7_000, endsAt: 27_000 });
     vi.mocked(hooks.useServerNow).mockReturnValue(5_000);

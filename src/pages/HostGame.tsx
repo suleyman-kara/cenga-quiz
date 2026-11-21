@@ -17,6 +17,7 @@ import { displayPlayers, type DisplayPlayer } from "../host/displayNames";
 import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../host/useAutoReveal";
 import { useWakeLock } from "../host/useWakeLock";
 import { useStageSounds } from "../host/useStageSounds";
+import { SoundLevelsControl, SoundOffBanner } from "../host/StageSoundControls";
 import { withRetry } from "../host/retry";
 import { friendlyError } from "../errors";
 import { Layout } from "../components/Layout";
@@ -133,6 +134,7 @@ function BigScreen({ pin }: { pin: string }) {
           qIndex: state.qIndex,
           players: players.length,
           secondsLeft: timerRunning ? remainingSeconds(state.endsAt, now) : null,
+          double: inQuestion && question?.index === state.qIndex && !!question.double,
         }
       : null,
   );
@@ -317,6 +319,7 @@ function BigScreen({ pin }: { pin: string }) {
                 )}
               </svg>
             </button>
+            <SoundLevelsControl sound={sound} />
           </>
         ) : undefined
       }
@@ -327,6 +330,7 @@ function BigScreen({ pin }: { pin: string }) {
             {t("common.computing")}
           </p>
         )}
+        {state?.phase === "lobby" && sound.off && <SoundOffBanner onEnable={sound.enable} />}
         <div className="stage__body">{body}</div>
         {error && (
           <p className="stage__error" role="alert">

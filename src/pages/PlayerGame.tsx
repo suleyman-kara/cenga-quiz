@@ -343,6 +343,16 @@ function QuestionView({
   );
 }
 
+/** Phones: a short double buzz when correct, one longer buzz when wrong (once per question). */
+function useVerdictBuzz(verdict: "correct" | "wrong" | "noAnswer", qIndex: number | undefined) {
+  const done = useRef<number | null>(null);
+  useEffect(() => {
+    if (qIndex === undefined || verdict === "noAnswer" || done.current === qIndex) return;
+    done.current = qIndex;
+    navigator.vibrate?.(verdict === "correct" ? [35, 60, 35] : 160);
+  }, [verdict, qIndex]);
+}
+
 function RevealView({
   score,
   reveal,
@@ -352,6 +362,7 @@ function RevealView({
   reveal: RevealData | null | undefined;
   question: PublicQuestion | null | undefined;
 }) {
+  useVerdictBuzz(!score?.lastAnswered ? "noAnswer" : score.lastCorrect ? "correct" : "wrong", reveal?.qIndex);
   if (!score) return <Loading variant="text" />;
   const verdict = !score.lastAnswered ? "noAnswer" : score.lastCorrect ? "correct" : "wrong";
   const correctText =
