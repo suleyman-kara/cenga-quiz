@@ -4,10 +4,29 @@
 telefondan oynayabildiği, açık kaynak ve kendi Firebase projenizde çalışan bir
 canlı quiz sistemi.
 
-<!-- Ekran görüntüleri: docs/ekran/ altına ekleyip aşağıdaki yolları güncelleyin. -->
-| Sunum ekranı | Oyuncu (telefon) | Podyum |
-|---|---|---|
-| ![Sunum ekranı](docs/ekran/sunum.png) | ![Oyuncu ekranı](docs/ekran/oyuncu.png) | ![Podyum](docs/ekran/podyum.png) |
+**Canlı:** <https://cenga-quiz.web.app> (oyuncu girişi) · `/host` (sunucu paneli)
+
+## Ekran görüntüleri
+
+### Sunum ekranı (projeksiyon)
+
+| Lobi: QR ile katılım | Soru |
+|---|---|
+| ![Lobi: büyük QR, altında adres ve PIN](docs/ekran/sahne-lobi.jpg) | ![Soru ekranı: renkli şıklar ve geri sayım halkası](docs/ekran/sahne-soru.jpg) |
+| **Cevap gösterimi** | **Sıralama: yer değişimi ve seri** |
+| ![Cevap: doğru şık büyür ve parlar, kaç kişinin bildiği yazar](docs/ekran/sahne-cevap.jpg) | ![Sıralama: lider tacı, alev rozeti, En çok yükselen etiketi ve ▲/▼ okları](docs/ekran/sahne-siralama.jpg) |
+| **Son sorularda 2× puan** | **Podyum ve ilk 10** |
+| ![Çift puanlı soru: 2× PUAN rozeti ve parlayan çerçeve](docs/ekran/sahne-cift-puan.jpg) | ![Podyum ve doğru sayılarıyla ilk 10](docs/ekran/sahne-podyum.jpg) |
+
+### Oyuncu (telefon)
+
+| Katılım | Soru | Doğru cevap | Final |
+|---|---|---|---|
+| <img src="docs/ekran/telefon-katil.jpg" alt="PIN hazır, takma ad girişi" width="190"> | <img src="docs/ekran/telefon-soru.jpg" alt="Telefonda dört renkli şık" width="190"> | <img src="docs/ekran/telefon-dogru.jpg" alt="Doğru! ekranı, puan ve liderlik farkı" width="190"> | <img src="docs/ekran/telefon-final.jpg" alt="Final sırası ve ilk 10" width="190"> |
+
+### Sunucu paneli: soru düzenleme
+
+![Quiz düzenleyici: soru kartı, şıklar, doğru cevap, süre ve görsel alanları](docs/ekran/panel-editor.jpg)
 
 ## Özellikler
 
@@ -15,17 +34,31 @@ canlı quiz sistemi.
   hesap açmaz, uygulama indirmez.
 - **Büyük ekran + telefon:** Sunum ekranında soru, geri sayım, cevap dağılımı,
   sıralama ve podyum; telefonda şık butonları ve kişisel sonuç.
-- **Adil puanlama:** Puan sunucuda hesaplanır. Soru metni telefonlara birkaç saniye
-  önce gider ("Hazır olun"), süre herkes için aynı anda başlar. Hız ve seri bonusu.
+- **QR ile katılım:** Lobide büyük bir QR kodu var; okutan oyuncu PIN yazmadan takma
+  ad ekranına gelir.
+- **Adil puanlama:** Puan sunucuda hesaplanır. "Hazır olun" sırasında sadece soru
+  görünür, şıklar süre herkes için aynı anda başlayınca gelir. Hız puanı (en fazla
+  1000) ve azalan adımlı seri bonusu (+40, +70, +90, +100).
+- **Son sorularda 2× puan:** Son 3 soru (ayarlanabilir) çift puan değerindedir.
+- **Heyecanlı sıralama:** Satırlar önceki yerinden kayarak gelir; yükselen/düşen
+  okları, seri alevi, lider tacı ve "En çok yükselen". Telefonda "2 sıra yükseldin"
+  ve "Önünde Ayşe var: 120 puan geridesin".
+- **Ses ve müzik:** Kodla üretilen lobi müziği, son saniyelerde hızlanan geri sayım
+  müziği, efektler ve podyum fanfarı (dosya ya da lisans gerekmez); müzik ve efekt
+  ses düzeyi ayrı ayarlanır. Telefonlar doğru/yanlışta titreşir.
+- **Sunucu kontrolü:** Süre bitmeden cevabı gösterme (onaylı), lobiyi kilitleme,
+  oyuncu çıkarma.
 - **Kulübe özel görünüm:** Ad, logo, renkler, fontlar, şık şekilleri ve final
   ekranı tek bir dosyada (`src/club.config.ts`).
-- **Lobi yönetimi:** Lobiyi kilitleme, uygunsuz takma adlı oyuncuyu çıkarma,
-  takma ad filtresi, en fazla 300 oyuncu (ayarlanabilir).
+- **Lobi güvenliği:** Takma ad filtresi, en fazla 300 oyuncu (ayarlanabilir).
 - **Kopmaya dayanıklı:** Oyuncu ekranı kilitlerse ya da sunucu bilgisayarı
   bağlantıyı kaybederse oyun kaldığı yerden devam eder.
-- **Quiz hazırlama:** Sorular sunucu panelinden elle eklenip düzenlenir (şık sayısı,
-  doğru cevap, süre, görsel) ya da JSON dosyasından içe aktarılır; editör desteği
-  için [JSON Schema](quizzes/quiz.schema.json) var.
+- **Quiz hazırlama:** Sorular panelden elle eklenip düzenlenir (şıklar, doğru cevap,
+  süre, görsel; çoğaltma, sürükle-bırak sıralama). "1. Soru… A) … Doğru Cevap: B"
+  biçimindeki metin yapıştırılınca sorular otomatik oluşur. JSON içe/dışa aktarma ve
+  editör desteği için [JSON Schema](quizzes/quiz.schema.json) var.
+- **Sunucu girişi:** E-posta + şifre; sadece izin listesindeki e-postalar kayıt
+  olabilir ve e-posta doğrulaması zorunludur.
 - **KVKK'ya uygun varsayılanlar:** Sadece takma ad, cevap ve puan saklanır; veriler
   AB'de (Belçika) tutulur ve sonuçlar belirli bir süre sonra otomatik silinir.
 - **Düşük maliyet:** Kulüp ölçeğinde Firebase'in ücretsiz kotalarının altında kalır.
@@ -68,6 +101,42 @@ test eder. Adımlar [`AGENTS.md`](AGENTS.md) içinde.
    ```
 
 5. Gerçek Firebase projesine bağlayıp yayına almak için aşağıdaki bölüme bakın.
+
+## Teknoloji yığını
+
+| Katman | Kullanılan |
+|---|---|
+| İstemci | React 19, TypeScript, Vite 8, React Router 7; QR için `qrcode-generator` |
+| Ses | Web Audio API (müzik ve efektler kodla üretilir) |
+| Barındırma | Firebase Hosting |
+| Kimlik | Firebase Authentication: oyuncular anonim, sunucular e-posta + şifre |
+| Canlı oyun | Firebase Realtime Database (`europe-west1`) |
+| Kalıcı veri | Cloud Firestore (quizler, sonuçlar; TTL ile otomatik silme) |
+| Sunucu mantığı | Cloud Functions 2. nesil, Node 22 (`europe-west1`): `host` ve `checkHostEmail` callable'ları, RTDB tetikleyicileri, zamanlanmış temizlik |
+| Güvenlik | Firestore ve RTDB Security Rules, App Check (reCAPTCHA Enterprise), kısıtlı API anahtarı |
+| Test | Vitest + Testing Library (birim/bileşen), Firebase Emulator (kurallar ve Functions) |
+
+Paylaşılan kod `shared/` altında: veri sözleşmesi (`types.ts`), puanlama ve quiz
+doğrulama hem istemcide hem Cloud Functions'ta aynı dosyadan çalışır.
+
+## Dağıtım (deployment)
+
+Şu anki kurulum:
+
+- **Firebase projesi:** `cenga-quiz`, Blaze planı; bütçe uyarıları açık.
+- **Bölge:** Realtime Database, Firestore ve Cloud Functions `europe-west1` (Belçika).
+- **Adres:** <https://cenga-quiz.web.app> (özel alan adı `quiz.cenga.org` planlanıyor).
+- **Sürüm yayınlama:** elle, geliştiricinin bilgisayarından Firebase CLI ile:
+
+  ```bash
+  npm run test:unit && npm run typecheck:all
+  npm run deploy             # web build + kurallar + Functions + Hosting
+  npm run deploy:hosting     # yalnızca arayüz
+  npm run deploy:functions   # yalnızca Cloud Functions
+  ```
+
+  Açık kalmış sayfalar yeni sürüm yayınlandığında bir sonraki ekran geçişinde
+  kendini bir kez yeniler.
 
 ## Firebase kurulumu
 
@@ -144,6 +213,7 @@ flowchart LR
     RT[("Realtime Database<br/>games/{pin}: canlı oyun")]
     subgraph CF["Cloud Functions (2. nesil)"]
       HC["host<br/>(callable)"]
+      CH["checkHostEmail<br/>(callable, kayıt öncesi)"]
       PJ["playerJoined / playerLeft<br/>(RTDB tetikleyicileri)"]
       CG["cleanupGames<br/>(30 dk'da bir)"]
     end
@@ -153,6 +223,8 @@ flowchart LR
   H & P --> AU
   H -- "quiz kaydet / oku" --> FS
   H -- "oyunu yönet" --> HC
+  H -- "kayıt kontrolü" --> CH
+  CH --> FS
   HC --> RT & FS
   P -- "katıl / cevapla" --> RT
   RT -- "oyun durumu (canlı)" --> H & P
@@ -204,6 +276,9 @@ Functions). At club scale it stays within the free quotas, so the cost is about 
 
 - **Set it up with an AI agent:** fork the repo and ask your coding agent:
   `Adapt this repo for [Club Name] ([website]), follow AGENTS.md.`
+- **Live:** <https://cenga-quiz.web.app>. Stack: React 19 + TypeScript + Vite on
+  Firebase (Hosting, Auth, Realtime Database, Firestore, Cloud Functions in
+  europe-west1); screenshots above.
 - **Manual setup:** fill in `src/club.config.ts`, put your logo in `public/club/`,
   then follow [`docs/firebase-kurulum.md`](docs/firebase-kurulum.md) (Turkish).
 - **Quiz format:** see [`quizzes/quiz.schema.json`](quizzes/quiz.schema.json).
