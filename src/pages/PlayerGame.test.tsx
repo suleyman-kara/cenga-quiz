@@ -150,6 +150,59 @@ describe("PlayerGame", () => {
     expect(screen.getByText(t("player.noAnswer"))).toBeInTheDocument();
   });
 
+  describe("early reveal by the host (countdown still had time left)", () => {
+    const tree = () => (
+      <MemoryRouter initialEntries={["/play/123456"]}>
+        <Routes>
+          <Route path="/play/:pin" element={<PlayerGame />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    // the reveal patch resets startedAt/endsAt to 0 (idle state) while the phone clock is mid-question
+    const revealed = (): GameState => ({ phase: "reveal", qIndex: 0, startedAt: 0, endsAt: 0, updatedAt: 6_000 });
+
+    it("a player who had not answered switches straight to the normal 'no answer' verdict", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(hooks.useMyScore).mockReturnValue(score({ lastDelta: 0, lastCorrect: false, lastAnswered: false, streak: 0 }));
+      const { rerender } = renderPlay();
+      expect(screen.getByRole("timer")).toBeInTheDocument();
+      vi.mocked(hooks.useGameState).mockReturnValue(revealed());
+      rerender(tree());
+      expect(screen.getByText(t("player.noAnswer"))).toBeInTheDocument();
+      expect(screen.getByText(/Ankara/)).toBeInTheDocument();
+      expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /İzmir|Bursa/ })).not.toBeInTheDocument();
+      expect(screen.queryByText(t("player.answerRejected"))).not.toBeInTheDocument();
+    });
+
+    it("a player who answered sees their verdict", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      const { rerender } = renderPlay();
+      await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+      expect(await screen.findByText(t("player.answerLocked"))).toBeInTheDocument();
+      vi.mocked(hooks.useGameState).mockReturnValue(revealed());
+      rerender(tree());
+      expect(screen.getByText(t("player.correct"))).toBeInTheDocument();
+      expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+    });
+
+    it("an answer still in flight when the reveal lands (then refused by the rules) does not disturb the reveal view", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(hooks.useMyScore).mockReturnValue(score({ lastDelta: 0, lastCorrect: false, lastAnswered: false }));
+      let reject!: (e: Error) => void;
+      vi.mocked(submitAnswer).mockReturnValue(new Promise<void>((_, r) => (reject = r)));
+      const { rerender } = renderPlay();
+      await userEvent.click(screen.getByRole("button", { name: /Bursa/ }));
+      vi.mocked(hooks.useGameState).mockReturnValue(revealed());
+      rerender(tree());
+      await act(async () => reject(Object.assign(new Error("PERMISSION_DENIED"), { code: "PERMISSION_DENIED" })));
+      expect(screen.getByText(t("player.noAnswer"))).toBeInTheDocument();
+      expect(screen.queryByText(t("player.answerRejected"))).not.toBeInTheDocument();
+      expect(screen.queryByText(t("player.sendFailed"))).not.toBeInTheDocument();
+      expect(localStorage.getItem("quiz.answered.123456.0")).toBeNull();
+    });
+  });
+
   it("leaderboard: shows own rank and score", () => {
     vi.mocked(hooks.useGameState).mockReturnValue(state("leaderboard"));
     renderPlay();

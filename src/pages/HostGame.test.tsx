@@ -290,11 +290,84 @@ describe("HostGame", () => {
     vi.mocked(hooks.useQuestion).mockReturnValue(question());
     const { rerender } = renderHost();
     await userEvent.click(screen.getByRole("button", { name: t("hostGame.reveal") }));
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.revealEarlyConfirmOk") }));
     expect(callsOf("reveal")).toHaveLength(1);
     vi.mocked(hooks.useServerNow).mockReturnValue(25_000);
     rerender(ui());
     await new Promise((r) => setTimeout(r, 20));
     expect(callsOf("reveal")).toHaveLength(1);
+  });
+
+  it("early Reveal (time left, not everyone answered) asks first; Cancel does nothing", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState());
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    vi.mocked(hooks.useAnswerUids).mockReturnValue(["u0"]);
+    renderHost();
+    const btn = screen.getByRole("button", { name: t("hostGame.reveal") });
+    expect(btn).toBeEnabled();
+    await userEvent.click(btn);
+    expect(screen.getByRole("alertdialog")).toHaveTextContent(t("hostGame.revealEarlyConfirm"));
+    expect(callsOf("reveal")).toHaveLength(0);
+    await userEvent.click(screen.getByRole("button", { name: t("common.cancel") }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(callsOf("reveal")).toHaveLength(0);
+  });
+
+  it("early Reveal: confirming reveals once with the expected qIndex", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState(1));
+    vi.mocked(hooks.useQuestion).mockReturnValue(question(1));
+    renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.reveal") }));
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.revealEarlyConfirmOk") }));
+    await waitFor(() => expect(callsOf("reveal")).toHaveLength(1));
+    expect(callsOf("reveal")[0][1]).toEqual({ pin: "123456", qIndex: 1 });
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("Reveal after time is up reveals immediately without asking", async () => {
+    // auto-reveal waits for the 300 ms grace; the button acts right away
+    vi.mocked(hooks.useGameState).mockReturnValue(qState());
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    vi.mocked(hooks.useServerNow).mockReturnValue(20_100);
+    renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.reveal") }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(callsOf("reveal")).toHaveLength(1);
+  });
+
+  it("a pending early-reveal dialog closes when the auto-reveal fires; no double reveal, no error", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState());
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    const { rerender } = renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.reveal") }));
+    const confirmOk = screen.getByRole("button", { name: t("hostGame.revealEarlyConfirmOk") });
+    vi.mocked(hooks.useServerNow).mockReturnValue(20_300);
+    rerender(ui());
+    await waitFor(() => expect(callsOf("reveal")).toHaveLength(1));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    // a click that raced the auto-reveal is a no-op
+    confirmOk.click();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(callsOf("reveal")).toHaveLength(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("a pending early-reveal dialog closes when the question changes", async () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState(0));
+    vi.mocked(hooks.useQuestion).mockReturnValue(question(0));
+    const { rerender } = renderHost();
+    await userEvent.click(screen.getByRole("button", { name: t("hostGame.reveal") }));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "reveal" });
+    rerender(ui());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    vi.mocked(hooks.useGameState).mockReturnValue(qState(1));
+    vi.mocked(hooks.useQuestion).mockReturnValue(question(1));
+    rerender(ui());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(callsOf("reveal")).toHaveLength(0);
   });
 
   it("shows the server's message for a refused action", async () => {

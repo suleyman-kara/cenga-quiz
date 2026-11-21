@@ -161,12 +161,13 @@ export function purgeInactivePlayers(room: Room): Patch {
   return patch;
 }
 
-/** Reveal is allowed when time is up or every joined player answered the current question. */
+/**
+ * The host may reveal once answering opened (now >= startedAt), even with time left: answers that
+ * arrived so far are scored, the rest count as "no answer". The "Hazır olun" lead-in is refused.
+ * Late answers are impossible afterwards: the lock (and then phase "reveal") freezes answer writes.
+ */
 export function canReveal(room: Room, now: number): boolean {
   const state = room.state;
   if (!state) return false;
-  if (now >= state.endsAt) return true;
-  const answers = answersFor(room, state.qIndex);
-  const uids = Object.keys(activePlayers(room));
-  return uids.length > 0 && uids.every((uid) => answers[uid] !== undefined);
+  return now >= state.startedAt;
 }

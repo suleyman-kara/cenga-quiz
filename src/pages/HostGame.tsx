@@ -1,4 +1,4 @@
-import { useCallback, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { GameMeta, GameState, HostActionMap, PublicQuestion, RevealData } from "../../shared/types";
 import {
@@ -107,6 +107,24 @@ function BigScreen({ pin }: { pin: string }) {
   });
   const computing = !!state?.lock && state.lock.at > now - LOCK_STALE_MS;
   const timerRunning = inQuestion && !!state && started && now < state.endsAt;
+  // Early reveal (time left, not everyone answered) asks first. The dialog is keyed by qIndex and
+  // closes by itself once the auto-reveal fires or the question/phase changes, so a late confirm
+  // can never send a second reveal (auto.reveal also ignores repeats for the same qIndex).
+  const [revealAskFor, setRevealAskFor] = useState<number | null>(null);
+  const askingReveal = revealAskFor === qIndex && timerRunning && !allAnswered && !auto.sent;
+  // once the dialog closed by itself, forget the request (it must never pop up again later)
+  useEffect(() => {
+    if (revealAskFor !== null && !askingReveal) setRevealAskFor(null);
+  }, [revealAskFor, askingReveal]);
+  const pressReveal = () => {
+    if (timerRunning && !allAnswered) setRevealAskFor(qIndex);
+    else auto.reveal();
+  };
+  const confirmReveal = () => {
+    const ask = askingReveal;
+    setRevealAskFor(null);
+    if (ask) auto.reveal();
+  };
   const sound = useStageSounds(
     state
       ? {
@@ -173,7 +191,7 @@ function BigScreen({ pin }: { pin: string }) {
             type="button"
             className="btn btn--primary btn--stage"
             disabled={auto.sent || !started}
-            onClick={auto.reveal}
+            onClick={pressReveal}
           >
             {t("hostGame.reveal")}
           </button>
@@ -334,6 +352,15 @@ function BigScreen({ pin }: { pin: string }) {
         cancelLabel={t("common.cancel")}
         onConfirm={confirmKick}
         onCancel={() => setKickTarget(null)}
+      />
+      <ConfirmDialog
+        open={askingReveal}
+        message={t("hostGame.revealEarlyConfirm")}
+        confirmLabel={t("hostGame.revealEarlyConfirmOk")}
+        cancelLabel={t("common.cancel")}
+        danger={false}
+        onConfirm={confirmReveal}
+        onCancel={() => setRevealAskFor(null)}
       />
     </Layout>
   );

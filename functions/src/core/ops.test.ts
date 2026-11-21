@@ -88,9 +88,39 @@ describe("planStart", () => {
 });
 
 describe("planReveal", () => {
-  it("refuses early reveal when not everyone answered", () => {
-    const r = applyPatch(started(10_000), { "answers/0/p1": { choice: 2, at: 11_000 } });
-    expect(errCode(() => planReveal(r, { ...host, now: 12_000 }))).toBe("failed-precondition");
+  it("host may reveal early (timer running, not everyone answered): answers so far score, the rest get 0", () => {
+    const r = applyPatch(started(10_000), { "answers/0/p1": { choice: 2, at: 11_000 } }) as Room;
+    const out = applyPatch(r, planReveal(r, { ...host, now: 12_000 })) as Room;
+    expect(out.state).toEqual({ phase: "reveal", qIndex: 0, startedAt: 0, endsAt: 0, updatedAt: 12_000 });
+    expect(out.reveal).toEqual({ qIndex: 0, correct: 2, counts: [0, 0, 1, 0] });
+    expect(out.scores?.p1).toMatchObject({ score: 950, lastAnswered: true, lastCorrect: true });
+    expect(out.scores?.p2).toMatchObject({ score: 0, lastDelta: 0, lastAnswered: false, lastCorrect: false });
+  });
+
+  it("host may reveal early with no answers at all: everyone gets 0", () => {
+    const r = started(10_000);
+    const out = applyPatch(r, planReveal(r, { ...host, now: 10_000 })) as Room;
+    expect(out.state?.phase).toBe("reveal");
+    expect(out.reveal?.counts).toEqual([0, 0, 0, 0]);
+    expect(out.scores?.p1).toMatchObject({ score: 0, lastAnswered: false });
+    expect(out.scores?.p2).toMatchObject({ score: 0, lastAnswered: false });
+  });
+
+  it("refuses to reveal during the lead-in (before answering opened)", () => {
+    const r = lobbyRoom();
+    const s = applyPatch(r, planStart(r, { ...host, config: { ...config, leadInMs: 3000 }, now: 10_000 })) as Room;
+    expect(s.state?.startedAt).toBe(13_000);
+    expect(errCode(() => planReveal(s, { ...host, now: 12_999 }))).toBe("failed-precondition");
+    expect(planReveal(s, { ...host, now: 13_000 }).state).toMatchObject({ phase: "reveal" });
+  });
+
+  it("after an early reveal, a late answer is never scored (second reveal refused, scores unchanged)", () => {
+    const r = applyPatch(started(10_000), { "answers/0/p1": { choice: 2, at: 11_000 } }) as Room;
+    const once = applyPatch(r, planReveal(r, { ...host, now: 12_000 })) as Room;
+    const late = applyPatch(once, { "answers/0/p2": { choice: 2, at: 12_500 } }) as Room;
+    expect(errCode(() => planReveal(late, { ...host, now: 13_000 }))).toBe("failed-precondition");
+    const lb = applyPatch(late, planShowLeaderboard(late, { ...host, now: 13_000 })) as Room;
+    expect(lb.scores).toEqual(once.scores);
   });
 
   it("scores and moves to reveal once everyone answered", () => {

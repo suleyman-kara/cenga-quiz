@@ -81,7 +81,7 @@ export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch
   const q = quiz.questions[qIndex];
   if (!q) throw new GameError("failed-precondition", "Geçersiz soru.");
   if (!canReveal(r, ctx.now)) {
-    throw new GameError("failed-precondition", "Süre dolmadan ve herkes cevaplamadan cevap gösterilemez.");
+    throw new GameError("failed-precondition", "Cevaplama başlamadan cevap gösterilemez.");
   }
   const { config } = ctx;
   const result = scoreQuestion({

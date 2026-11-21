@@ -82,18 +82,19 @@ describe("answersFor / canReveal", () => {
     expect(answersFor(room, 1)).toEqual({});
   });
 
-  it("refuses before endsAt when not everyone answered", () => {
-    expect(canReveal({ ...room, answers: { "1": { p1: { choice: 0, at: 1 } } } }, 4999)).toBe(false);
+  it("allows the host to reveal any time after answering opened (even with time left)", () => {
+    expect(canReveal({ ...room, answers: { "1": { p1: { choice: 0, at: 1 } } } }, 4999)).toBe(true);
+    expect(canReveal(room, 0)).toBe(true);
   });
   it("allows at/after endsAt", () => {
     expect(canReveal(room, 5000)).toBe(true);
   });
-  it("allows early when all players answered the current question", () => {
-    const answers = { "0": { p1: { choice: 0, at: 1 } }, "1": { p1: { choice: 0, at: 1 }, p2: { choice: 1, at: 2 } } };
-    expect(canReveal({ ...room, answers }, 100)).toBe(true);
+  it("refuses during the lead-in (before startedAt), even if answers exist", () => {
+    const leadIn = { ...room, state: { ...room.state, startedAt: 3000, endsAt: 8000 } };
+    expect(canReveal(leadIn, 2999)).toBe(false);
+    expect(canReveal(leadIn, 3000)).toBe(true);
   });
-  it("ignores answers for other questions", () => {
-    const answers = { "0": { p1: { choice: 0, at: 1 }, p2: { choice: 0, at: 1 } } };
-    expect(canReveal({ ...room, answers }, 100)).toBe(false);
+  it("refuses without a state", () => {
+    expect(canReveal({ ...room, state: undefined }, 100)).toBe(false);
   });
 });

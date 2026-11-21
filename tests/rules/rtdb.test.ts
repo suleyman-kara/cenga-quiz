@@ -348,6 +348,17 @@ describe("RTDB: answers", () => {
     await seed({ phase, qIndex: 0, endsAt: Date.now() + 60_000 });
     await assertFails(answer(P1, 0, 1));
   });
+  it("rejects a late answer after an early reveal even though endsAt is still in the future", async () => {
+    await seed({ phase: "question", qIndex: 0, endsAt: Date.now() + 60_000 });
+    await assertSucceeds(answer(P1, 0, 1));
+    // the host revealed early: phase moves on, endsAt (and startedAt) left as they were
+    await owner().ref(`${G}/state/phase`).set("reveal");
+    await assertFails(answer(P2, 0, 1));
+    // also refused while the reveal transition holds the lock (before the phase flips)
+    await owner().ref(`${G}/state/phase`).set("question");
+    await owner().ref(`${G}/state/lock`).set({ by: "reveal", at: Date.now() });
+    await assertFails(answer(P2, 0, 1));
+  });
   it("rejects answers from users who have not joined", async () => {
     await seed({ phase: "question", qIndex: 0 });
     await assertFails(answer(OUTSIDER, 0, 1));
