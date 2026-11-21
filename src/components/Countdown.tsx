@@ -11,6 +11,15 @@ export function remainingSeconds(endsAt: number, serverNow: number): number {
   return Math.ceil(remaining(endsAt, serverNow) / 1000);
 }
 
+export type TimerTone = "calm" | "warning" | "urgent";
+
+/** Ring colour stage: calm in the first half, warning in the second, urgent in the last 5 s. */
+export function timerTone(msLeft: number, totalSeconds: number): TimerTone {
+  if (Math.ceil(msLeft / 1000) <= 5) return "urgent";
+  if (msLeft <= (totalSeconds * 1000) / 2) return "warning";
+  return "calm";
+}
+
 interface Props {
   endsAt: number;
   totalSeconds: number;
@@ -31,6 +40,7 @@ export function Countdown({ endsAt, totalSeconds, serverNow, size = "sm" }: Prop
       role="timer"
       aria-label={t("hostGame.secondsLeft", { seconds: secs })}
       data-urgent={secs <= 5 || undefined}
+      data-tone={timerTone(ms, totalSeconds)}
     >
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <circle className="countdown__track" cx="50" cy="50" r={R} />

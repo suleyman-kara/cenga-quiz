@@ -477,4 +477,42 @@ describe("PlayerGame", () => {
     renderPlay();
     expect(screen.queryByText(t("question.double"))).not.toBeInTheDocument();
   });
+  it("reveal (correct): full-screen colour flash and confetti", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    renderPlay();
+    expect(document.querySelector(".verdict-flash")).not.toBeNull();
+    expect(document.querySelector(".confetti")).not.toBeNull();
+  });
+
+  it("reveal (wrong): no flash, no confetti", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ lastCorrect: false, lastDelta: 0, streak: 0 }));
+    renderPlay();
+    expect(document.querySelector(".verdict-flash")).toBeNull();
+    expect(document.querySelector(".confetti")).toBeNull();
+  });
+
+  it("reveal: a streak of 3+ is 'on fire' (extra animation hook + text); 2 is not", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ streak: 3 }));
+    const { unmount } = renderPlay();
+    expect(screen.getByRole("status")).toHaveAttribute("data-hot");
+    expect(screen.getByText(t("player.onFire"))).toBeInTheDocument();
+    unmount();
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ streak: 2 }));
+    renderPlay();
+    expect(screen.getByRole("status")).not.toHaveAttribute("data-hot");
+    expect(screen.queryByText(t("player.onFire"))).not.toBeInTheDocument();
+  });
+
+  it("double-points question tints the screen edge; a normal one does not", () => {
+    vi.mocked(hooks.useQuestion).mockReturnValue({ ...question, double: true });
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    const { unmount } = renderPlay();
+    expect(document.querySelector(".double-edge")).not.toBeNull();
+    unmount();
+    vi.mocked(hooks.useQuestion).mockReturnValue(question);
+    renderPlay();
+    expect(document.querySelector(".double-edge")).toBeNull();
+  });
 });

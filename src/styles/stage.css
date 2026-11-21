@@ -769,8 +769,9 @@ li[data-duplicate] {
   height: var(--size);
   color: var(--c);
   opacity: 0;
-  animation: fall var(--dur) linear 3;
-  animation-delay: calc(2.9s + var(--delay));
+  /* --loops / --start come from <Confetti> props; defaults = podium timing */
+  animation: fall var(--dur) linear var(--loops, 3);
+  animation-delay: calc(var(--start, 2.9s) + var(--delay));
 }
 
 .confetti__piece .choice-shape {
@@ -1392,4 +1393,605 @@ li[data-duplicate] {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* ==========================================================================
+   CANLI SAHNE — renkli, enerjik büyük ekran
+   Hepsi club.config renklerinden (CSS değişkenleri + color-mix) türetilir.
+   Yalnızca transform/opacity animasyonu; prefers-reduced-motion'da kapanır
+   (renkler kalır). Bu blok önceki kuralları üzerine yazar; sırası önemli.
+   ========================================================================== */
+
+.layout--stage {
+  /* the fixed backdrop (z-index -1) sits above this element's own background */
+  isolation: isolate;
+  /* derived accents: amber between the club's green and red (oklch hue path), and a light gold */
+  --timer-warning: color-mix(in oklch, var(--color-accent), var(--color-primary-bright));
+  --stage-gold: color-mix(in oklch, color-mix(in oklch, var(--color-accent) 45%, var(--color-primary-bright)) 55%, white);
+  /* dark base under translucent panels so text keeps its contrast over the colourful backdrop */
+  --stage-base: color-mix(in srgb, var(--color-stage) 72%, transparent);
+}
+
+/* ---------- arka plan: yavaş kayan renk lekeleri + soluk yüzen şekiller ---------- */
+.stage-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* darker centre keeps the question and names readable (projectors wash colours out) */
+.stage-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 75% 65% at 50% 50%,
+    color-mix(in srgb, var(--color-stage) 55%, transparent),
+    color-mix(in srgb, var(--color-stage) 10%, transparent)
+  );
+}
+
+.stage-backdrop__blob {
+  position: absolute;
+  width: 64vmax;
+  height: 64vmax;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--c) 75%, transparent),
+    color-mix(in srgb, var(--c) 28%, transparent) 55%,
+    transparent
+  );
+  opacity: 0.5;
+  will-change: transform;
+  transition: opacity 1.2s ease;
+  animation: backdrop-drift 28s ease-in-out infinite alternate;
+}
+
+.stage-backdrop__blob[data-choice="0"] {
+  left: -20vmax;
+  top: -24vmax;
+  --dx: 9vmax;
+  --dy: 7vmax;
+}
+.stage-backdrop__blob[data-choice="1"] {
+  right: -22vmax;
+  top: -14vmax;
+  --dx: -8vmax;
+  --dy: 9vmax;
+  animation-duration: 33s;
+  animation-delay: -9s;
+}
+.stage-backdrop__blob[data-choice="2"] {
+  left: -12vmax;
+  bottom: -28vmax;
+  --dx: 10vmax;
+  --dy: -8vmax;
+  animation-duration: 36s;
+  animation-delay: -17s;
+}
+.stage-backdrop__blob[data-choice="3"] {
+  right: -18vmax;
+  bottom: -26vmax;
+  --dx: -9vmax;
+  --dy: -7vmax;
+  animation-duration: 30s;
+  animation-delay: -5s;
+}
+
+@keyframes backdrop-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(var(--dx, 6vmax), var(--dy, 6vmax)) scale(1.14);
+  }
+  100% {
+    transform: translate(calc(var(--dx, 6vmax) * -0.5), calc(var(--dy, 6vmax) * 0.8)) scale(0.92);
+  }
+}
+
+/* phase mood: calmer while people read the question, brighter on reveal / ending */
+.stage-backdrop[data-phase="question"] .stage-backdrop__blob {
+  opacity: 0.4;
+}
+.stage-backdrop[data-phase="reveal"] .stage-backdrop__blob,
+.stage-backdrop[data-phase="ended"] .stage-backdrop__blob {
+  opacity: 0.62;
+}
+
+.stage-backdrop__shape {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  color: var(--c);
+  opacity: 0.18;
+  transform: translate(-50%, -50%);
+  animation: backdrop-float var(--dur, 36s) ease-in-out var(--delay, 0s) infinite alternate;
+}
+
+.stage-backdrop__shape .choice-shape {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes backdrop-float {
+  from {
+    transform: translate(-50%, -50%) rotate(-14deg);
+  }
+  to {
+    transform: translate(calc(-50% + 48px), calc(-50% - 70px)) rotate(20deg);
+  }
+}
+
+.stage-backdrop--still .stage-backdrop__blob,
+.stage-backdrop--still .stage-backdrop__shape {
+  animation: none;
+}
+
+/* readable surfaces over the colourful backdrop */
+.layout--stage .stage-question__text {
+  text-shadow: 0 2px 14px color-mix(in srgb, var(--color-stage) 85%, transparent);
+}
+
+.layout--stage .leaderboard__row:not([data-rank="1"]) {
+  background: linear-gradient(var(--tint), var(--tint)), var(--stage-base);
+}
+
+.layout--stage .stage-lobby__players,
+.layout--stage .stage-answered,
+.layout--stage .stage-kicker > p {
+  background-color: var(--stage-base);
+}
+
+.layout--stage .stage-answered,
+.layout--stage .stage-kicker > p {
+  padding: 4px 14px;
+  border-radius: 999px;
+}
+
+.layout--stage .stage-answered {
+  align-self: flex-end;
+}
+
+/* ---------- lobi: isimler zıplayarak, rastgele şık renginde gelir ---------- */
+.name-grid {
+  /* room for the pop-in overshoot (the grid clips overflow) */
+  padding: 8px;
+  margin: -8px;
+}
+
+.name-grid li {
+  background: var(--c);
+  color: var(--c-on);
+  border-color: color-mix(in srgb, var(--c-on) 22%, var(--c));
+  box-shadow: inset 0 -3px 0 color-mix(in srgb, black 25%, transparent);
+  animation: name-pop 0.7s var(--ease-out) both;
+}
+
+.name-grid li .choice-shape {
+  background: color-mix(in srgb, var(--c-on) 20%, transparent);
+  color: var(--c-on);
+}
+
+.name-grid .kick-btn {
+  color: currentColor;
+}
+
+@keyframes name-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(var(--tilt, 0deg));
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.18) rotate(calc(var(--tilt, 0deg) * -0.6));
+  }
+  78% {
+    transform: scale(0.94) rotate(calc(var(--tilt, 0deg) * 0.3));
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ---------- soru: tam renkli şık kutuları, büyük şekiller, hafif kayan parıltı ---------- */
+.stage-option {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(135deg, var(--c) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 76%, black) 100%);
+  box-shadow:
+    inset 0 -8px 0 color-mix(in srgb, black 28%, transparent),
+    0 18px 40px -20px color-mix(in srgb, var(--c) 80%, black);
+}
+
+/* a soft light band sweeps across each tile now and then (transform only) */
+.stage-option::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -50%;
+  width: 50%;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent, color-mix(in srgb, white 11%, transparent), transparent);
+  animation: option-sheen 6s ease-in-out infinite;
+  animation-delay: calc(0.8s + var(--i, 0) * 0.7s);
+}
+
+@keyframes option-sheen {
+  0% {
+    transform: translateX(0);
+  }
+  35%,
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.stage-option .choice-shape {
+  flex: none;
+  width: clamp(56px, 8.5vh, 96px);
+  height: clamp(56px, 8.5vh, 96px);
+  padding: clamp(8px, 1.2vh, 14px);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-on) 16%, transparent);
+}
+
+/* ---------- süre halkası: sakin → uyarı → acil; son 5 sn hafif nabız ---------- */
+.layout--stage .countdown {
+  border-radius: 50%;
+  background: var(--stage-base);
+}
+
+.layout--stage .countdown::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  box-shadow: 0 0 36px 8px var(--ring, transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.layout--stage .countdown[data-tone="calm"] .countdown__arc {
+  stroke: var(--color-accent);
+}
+
+.layout--stage .countdown[data-tone="warning"] .countdown__arc {
+  stroke: var(--timer-warning);
+}
+
+.layout--stage .countdown[data-tone="urgent"] .countdown__arc {
+  stroke: var(--color-primary-bright);
+}
+
+.layout--stage .countdown[data-tone="warning"]::before {
+  --ring: color-mix(in srgb, var(--timer-warning) 45%, transparent);
+  opacity: 0.8;
+}
+
+.layout--stage .countdown[data-tone="urgent"]::before {
+  --ring: color-mix(in srgb, var(--color-primary-bright) 70%, transparent);
+  animation: timer-glow 1s ease-in-out infinite;
+}
+
+.layout--stage .countdown[data-tone="urgent"] {
+  animation: timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.07);
+  }
+}
+
+@keyframes timer-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  15% {
+    opacity: 1;
+  }
+}
+
+/* ---------- çift puan: rozetin yanında kırmızı/yeşil nöbetleşe parlayan çerçeve ---------- */
+.stage-question[data-double] {
+  position: relative;
+}
+
+.stage-question[data-double]::before,
+.stage-question[data-double]::after {
+  content: "";
+  position: absolute;
+  inset: -12px -16px;
+  border-radius: var(--radius-xl);
+  pointer-events: none;
+  animation: double-frame 1.6s ease-in-out infinite alternate;
+}
+
+.stage-question[data-double]::before {
+  box-shadow:
+    0 0 0 4px var(--color-primary-bright),
+    0 0 46px 6px color-mix(in srgb, var(--color-primary-bright) 55%, transparent);
+}
+
+.stage-question[data-double]::after {
+  box-shadow:
+    0 0 0 4px var(--color-accent),
+    0 0 46px 6px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  animation-direction: alternate-reverse;
+}
+
+@keyframes double-frame {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.15;
+  }
+}
+
+/* ---------- açıklama anı: çubuklar yükselir, doğru şık büyür ve parlar ---------- */
+.stage-reveal {
+  /* own stacking context: the reveal confetti (z-index -1) falls behind the bars, above the backdrop */
+  position: relative;
+  z-index: 0;
+}
+
+.stage-reveal__verdict {
+  align-self: flex-start;
+  margin: 0;
+  padding: 8px 22px;
+  border-radius: 999px;
+  font: 800 clamp(1.2rem, 2.3vw, 2.1rem) / 1.1 var(--font-display);
+  background: var(--stage-base);
+  border: 1px solid var(--stage-line);
+  color: var(--stage-soft);
+  animation: move-pop 0.5s 1.1s var(--ease-spring) both;
+}
+
+.stage-reveal__verdict[data-celebrate] {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: transparent;
+  box-shadow: 0 12px 34px -12px color-mix(in srgb, var(--color-accent) 85%, transparent);
+}
+
+.dist__bar {
+  animation: dist-grow 0.9s var(--ease-spring) both;
+  animation-delay: calc(0.15s + var(--i, 0) * 0.12s);
+}
+
+@keyframes dist-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* the count ticks up while its bar grows (CSS counter, see .countup__n in player.css) */
+.dist__count {
+  animation-delay: calc(0.15s + var(--i, 0) * 0.12s);
+}
+
+.dist__count .countup__n {
+  animation-duration: 0.9s;
+  animation-delay: calc(0.15s + var(--i, 0) * 0.12s);
+}
+
+.dist__row {
+  transform-origin: 50% 100%;
+}
+
+/* wrong options dim and shrink once the bars have landed (opacity/transform only) */
+.dist__row[data-correct="false"] {
+  opacity: 0.3;
+  filter: none;
+  transform: scale(0.92);
+  animation: dist-dim 0.6s 1.1s var(--ease-out) both;
+}
+
+@keyframes dist-dim {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dist__row[data-correct="true"] {
+  position: relative;
+  z-index: 1;
+  transform: scale(1.05);
+  animation: dist-win 0.7s 1.1s var(--ease-spring) both;
+}
+
+@keyframes dist-win {
+  0% {
+    transform: none;
+  }
+  50% {
+    transform: scale(1.11);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+.dist__row[data-correct="true"] .dist__label {
+  position: relative;
+}
+
+/* pulsing glow around the correct answer */
+.dist__row[data-correct="true"] .dist__label::after,
+.dist__row[data-correct="true"] .dist__bar::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 40px 12px color-mix(in srgb, var(--color-accent) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: glow-pulse 1.6s 1.7s ease-in-out infinite;
+}
+
+.dist__row[data-correct="true"] .dist__bar {
+  position: relative;
+}
+
+.dist__row[data-correct="true"] .dist__bar::after {
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 56px 14px color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* shorter screens (1280×720, 1024×768): keep everything above the controls */
+@media (max-height: 820px) {
+  .dist {
+    height: 38vh;
+  }
+  .dist__count {
+    font-size: 1.9rem;
+  }
+  .stage-reveal {
+    gap: 14px;
+  }
+}
+
+/* ---------- sıralama anı: lider tacı, en çok yükselen, alev alan seri ---------- */
+.leaderboard--moves .leaderboard__row[data-rank="1"] {
+  box-shadow:
+    inset 0 -5px 0 var(--color-primary-dark),
+    0 0 0 3px color-mix(in srgb, var(--stage-gold) 70%, transparent),
+    0 16px 46px -10px color-mix(in srgb, var(--color-primary-bright) 80%, transparent);
+}
+
+.leaderboard__crown {
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.35em;
+  vertical-align: -0.14em;
+  fill: var(--stage-gold);
+  stroke: color-mix(in srgb, var(--color-primary-dark) 60%, black);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  transform-origin: 50% 100%;
+  animation:
+    crown-in 0.6s 1.3s var(--ease-spring) both,
+    crown-bob 2.6s 2s ease-in-out infinite;
+}
+
+@keyframes crown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.6em) scale(0.3) rotate(-25deg);
+  }
+}
+
+@keyframes crown-bob {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translateY(-0.08em) rotate(-6deg);
+  }
+}
+
+.leaderboard__row[data-climber] {
+  outline: 3px solid var(--color-accent);
+  outline-offset: -3px;
+}
+
+.leaderboard__climber {
+  font: 800 0.6em / 1 var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  animation: climber-in 0.6s 1.45s var(--ease-spring) both;
+}
+
+@keyframes climber-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.5);
+  }
+}
+
+/* streak ≥ 3: a bigger, flickering flame on a bright pill */
+.leaderboard__row .leaderboard__streak[data-hot] {
+  padding: 4px 12px 4px 6px;
+  background: var(--color-primary-bright);
+  color: var(--color-on-primary);
+  box-shadow: 0 0 18px -2px color-mix(in srgb, var(--color-primary-bright) 80%, transparent);
+  font-size: 0.85em;
+}
+
+.leaderboard__row[data-rank="1"] .leaderboard__streak[data-hot] {
+  box-shadow: 0 0 0 2px var(--color-on-primary);
+}
+
+.leaderboard__streak[data-hot] svg {
+  width: 1.5em;
+  height: 1.5em;
+  fill: var(--stage-gold);
+  transform-origin: 50% 90%;
+  animation: flicker 1.1s ease-in-out infinite;
+}
+
+/* ---------- hareket azaltma: animasyon yok, renkler kalır ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .stage-backdrop__blob,
+  .stage-backdrop__shape,
+  .name-grid li,
+  .layout--stage .countdown,
+  .layout--stage .countdown::before,
+  .stage-question[data-double]::before,
+  .stage-question[data-double]::after,
+  .stage-reveal__verdict,
+  .dist__bar,
+  .dist__count,
+  .dist__row,
+  .countup__n,
+  .leaderboard__crown,
+  .leaderboard__climber,
+  .leaderboard__streak[data-hot] svg {
+    animation: none;
+  }
+  .stage-option::after {
+    display: none;
+  }
+  .layout--stage .countdown[data-tone="urgent"]::before,
+  .dist__row[data-correct="true"] .dist__label::after,
+  .dist__row[data-correct="true"] .dist__bar::after {
+    opacity: 0.8;
+  }
+  .stage-question[data-double]::after {
+    display: none;
+  }
 }

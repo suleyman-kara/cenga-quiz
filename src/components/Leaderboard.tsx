@@ -41,11 +41,34 @@ export function rankMove(e: { rank: number; prevRank?: number }): number {
   return typeof e.prevRank === "number" && e.prevRank > 0 ? e.prevRank - e.rank : 0;
 }
 
+/** Index of the row that climbed the most places this round (ties → better rank), or -1. */
+export function biggestClimber(rows: readonly { rank: number; prevRank?: number }[]): number {
+  let best = -1;
+  let bestMove = 0;
+  rows.forEach((e, i) => {
+    const move = rankMove(e);
+    if (move > bestMove) {
+      best = i;
+      bestMove = move;
+    }
+  });
+  return best;
+}
+
+/** From this many correct answers in a row the flame gets the "hot" treatment. */
+export const HOT_STREAK = 3;
+
+export function isHotStreak(streak: number | undefined): boolean {
+  return typeof streak === "number" && streak >= HOT_STREAK;
+}
+
 export function Leaderboard({ entries, limit = 10, detailed = false, movement = false, label, className }: Props) {
   const rows = entries.slice(0, limit);
   if (rows.length === 0) return <p className="muted">{t("leaderboard.empty")}</p>;
   const top = Math.max(1, rows[0]?.score ?? 1);
   const prevIndex = movement ? previousIndexes(rows) : null;
+  // leaderboard moment (movement mode only): crown for the leader, callout for the biggest climber
+  const climber = movement ? biggestClimber(rows) : -1;
   const classes = [
     "leaderboard",
     rows.length > 5 && "leaderboard--dense",
@@ -67,15 +90,24 @@ export function Leaderboard({ entries, limit = 10, detailed = false, movement = 
             className="leaderboard__row"
             data-rank={e.rank}
             data-move={move > 0 ? "up" : move < 0 ? "down" : undefined}
+            data-climber={i === climber || undefined}
             style={style as CSSProperties}
           >
             <span className="leaderboard__rank">{e.rank}</span>
-            <span className="leaderboard__name">{displayName(e.name, i + 1).label}</span>
+            <span className="leaderboard__name">
+              {movement && e.rank === 1 && (
+                <svg className="leaderboard__crown" viewBox="0 0 24 24" role="img" aria-label={t("leaderboard.leader")}>
+                  <path d="M3 8.5l4.6 3.6L12 5l4.4 7.1L21 8.5 19.2 18H4.8z" />
+                </svg>
+              )}
+              {displayName(e.name, i + 1).label}
+            </span>
             {movement && (
               <span className="leaderboard__meta">
                 {typeof e.streak === "number" && e.streak >= 2 && (
                   <span
                     className="leaderboard__streak"
+                    data-hot={isHotStreak(e.streak) || undefined}
                     role="img"
                     aria-label={t("leaderboard.streak", { streak: e.streak })}
                     title={t("leaderboard.streak", { streak: e.streak })}
@@ -86,6 +118,7 @@ export function Leaderboard({ entries, limit = 10, detailed = false, movement = 
                     <span aria-hidden="true">{e.streak}</span>
                   </span>
                 )}
+                {i === climber && <span className="leaderboard__climber">{t("leaderboard.topClimber")}</span>}
                 {move !== 0 && (
                   <span
                     className={`leaderboard__move leaderboard__move--${move > 0 ? "up" : "down"}`}

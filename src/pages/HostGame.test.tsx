@@ -624,4 +624,61 @@ describe("HostGame", () => {
     renderHost();
     expect(screen.queryByText(t("question.double"))).not.toBeInTheDocument();
   });
+  it("reveal: confetti and a 'got it right' headline when at least one player was correct", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), phase: "reveal" });
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    vi.mocked(hooks.useReveal).mockReturnValue({ qIndex: 0, correct: 1, counts: [4, 7] });
+    renderHost();
+    expect(document.querySelector(".stage-reveal .confetti")).not.toBeNull();
+    expect(screen.getByText(t("hostGame.correctCount", { count: 7 }))).toBeInTheDocument();
+  });
+
+  it("reveal: no confetti when nobody got it right", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), phase: "reveal" });
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    vi.mocked(hooks.useReveal).mockReturnValue({ qIndex: 0, correct: 1, counts: [4, 0] });
+    renderHost();
+    expect(document.querySelector(".confetti")).toBeNull();
+    expect(screen.getByText(t("hostGame.nobodyCorrect"))).toBeInTheDocument();
+  });
+
+  it("leaderboard: the biggest climber of the round gets a callout", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(1), phase: "leaderboard" });
+    vi.mocked(hooks.useLeaderboard).mockReturnValue({
+      top: [
+        { name: "Ali", score: 900, rank: 1, prevRank: 1 },
+        { name: "Veli", score: 800, rank: 2, prevRank: 5 },
+        { name: "Can", score: 700, rank: 3, prevRank: 2 },
+      ],
+      playerCount: 3,
+    });
+    renderHost();
+    const rows = within(screen.getByRole("list", { name: t("leaderboard.title") })).getAllByRole("listitem");
+    expect(within(rows[1]).getByText(t("leaderboard.topClimber"))).toBeInTheDocument();
+  });
+
+  it("stage has a decorative animated backdrop that follows the phase", () => {
+    renderHost();
+    expect(document.querySelector(".stage-backdrop")).toHaveAttribute("data-phase", "lobby");
+  });
+
+  it("lobby: each name gets a stable colour picked from the player id", () => {
+    const { unmount } = renderHost();
+    const colours = screen.getAllByText(/^Oyuncu \d$/).map((el) => el.closest("li")!.getAttribute("data-choice"));
+    unmount();
+    renderHost();
+    expect(screen.getAllByText(/^Oyuncu \d$/).map((el) => el.closest("li")!.getAttribute("data-choice"))).toEqual(colours);
+    for (const c of colours) expect(Number(c)).toBeLessThan(club.choices.length);
+  });
+
+  it("double-points question: the stage gets the extra double flourish", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState());
+    vi.mocked(hooks.useQuestion).mockReturnValue({ ...question(), double: true });
+    const { unmount } = renderHost();
+    expect(document.querySelector(".stage-question")).toHaveAttribute("data-double");
+    unmount();
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    renderHost();
+    expect(document.querySelector(".stage-question")).not.toHaveAttribute("data-double");
+  });
 });

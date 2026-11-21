@@ -1576,3 +1576,206 @@
   align-self: flex-start;
 }
 
+
+/* ==========================================================================
+   CANLI TELEFON ANLARI — doğru: tam ekran renk patlaması + konfeti;
+   yanlış: sarsılma + sönük renk; 3+ seri: alev; 2× PUAN: kenar ışıması.
+   Renkler club.config değişkenlerinden; yalnızca transform/opacity animasyonu.
+   ========================================================================== */
+
+/* full-screen colour flash on a correct answer (one short flash, no strobing) */
+.verdict-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 40%,
+    color-mix(in srgb, var(--color-accent) 55%, var(--color-surface)),
+    var(--color-accent) 70%
+  );
+  opacity: 0;
+  animation: verdict-flash 0.9s ease-out both;
+}
+
+@keyframes verdict-flash {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* phone confetti falls once, in front of the verdict card (small, never blocks taps) */
+.confetti--phone {
+  z-index: 30;
+}
+
+/* bigger celebration: the check pops harder, the headline bounces in, sparks fly further */
+.verdict--correct .verdict__icon {
+  width: 104px;
+  height: 104px;
+  animation: verdict-pop 0.7s 0.15s var(--ease-spring) both;
+}
+
+.verdict--correct .verdict__icon > svg {
+  width: 58px;
+  height: 58px;
+}
+
+@keyframes verdict-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.verdict--correct .headline {
+  font-size: clamp(2rem, 10vw, 2.8rem);
+  animation: shape-pop 0.5s 0.3s var(--ease-spring) both;
+}
+
+.verdict--correct .verdict__spark {
+  --r: 156px;
+}
+
+.verdict--correct .verdict__spark:nth-child(even) {
+  --r: 112px;
+}
+
+/* wrong: a short shake and a muted, greyish card (text colours unchanged) */
+.verdict--wrong {
+  background: linear-gradient(
+    color-mix(in srgb, var(--color-text) 12%, var(--color-surface)),
+    color-mix(in srgb, var(--color-text) 4%, var(--color-surface)) 60%
+  );
+  animation:
+    verdict-in 0.35s var(--ease-out),
+    verdict-shake 0.6s 0.25s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes verdict-shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(4px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-9px);
+  }
+  40%,
+  60% {
+    transform: translateX(9px);
+  }
+}
+
+/* streak ≥ 3: bright pill, bigger flame, gentle pulse + a ring pulsing from the check mark */
+.streak--hot {
+  padding: 8px 18px 8px 12px;
+  font-size: 1.05rem;
+  background: linear-gradient(110deg, var(--color-primary-bright), var(--color-primary));
+  color: var(--color-on-primary);
+  box-shadow: 0 10px 26px -10px color-mix(in srgb, var(--color-primary-bright) 85%, transparent);
+  animation:
+    shape-pop 0.5s 0.6s var(--ease-spring) both,
+    streak-hot 1.4s 1.2s ease-in-out infinite;
+}
+
+.streak--hot .streak__flame {
+  width: 30px;
+  height: 30px;
+  fill: color-mix(in oklch, color-mix(in oklch, var(--color-accent) 45%, var(--color-primary-bright)) 55%, white);
+  animation-duration: 0.9s;
+}
+
+.streak__fire {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@keyframes streak-hot {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+.verdict[data-hot] .verdict__icon::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 3px solid var(--color-on-accent);
+  opacity: 0;
+  animation: hot-ring 1.4s 0.9s ease-out infinite;
+}
+
+@keyframes hot-ring {
+  from {
+    opacity: 0.8;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* 2× PUAN: the screen edge glows in the brand red while the question is open */
+.double-edge {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 5px var(--color-primary-bright),
+    inset 0 0 44px 10px color-mix(in srgb, var(--color-primary-bright) 50%, transparent);
+  animation: double-edge 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes double-edge {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* hareket azaltma: animasyon yok (flaş da yok), renkler kalır */
+@media (prefers-reduced-motion: reduce) {
+  .verdict-flash {
+    display: none;
+  }
+  .verdict--wrong,
+  .verdict--correct .verdict__icon,
+  .verdict--correct .headline,
+  .streak--hot,
+  .streak--hot .streak__flame,
+  .verdict[data-hot] .verdict__icon::after,
+  .double-edge,
+  .countup__n {
+    animation: none;
+  }
+  .double-edge {
+    opacity: 1;
+  }
+}

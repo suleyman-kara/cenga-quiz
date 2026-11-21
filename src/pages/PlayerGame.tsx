@@ -24,7 +24,8 @@ import { Loading } from "../components/Loading";
 import { StreakBadge } from "../components/StreakBadge";
 import { GapLine, MoveLine } from "../components/GapLine";
 import { DoubleBadge } from "../components/DoubleBadge";
-import { Leaderboard as LeaderboardList } from "../components/Leaderboard";
+import { Leaderboard as LeaderboardList, isHotStreak } from "../components/Leaderboard";
+import { Confetti } from "../components/Confetti";
 import { club } from "../club.config";
 import { t } from "../i18n";
 
@@ -116,7 +117,12 @@ export function PlayerGame() {
         );
         break;
       case "reveal":
-        body = <RevealView score={score} reveal={reveal} question={question} />;
+        body = (
+          <>
+            <VerdictCelebration score={score} />
+            <RevealView score={score} reveal={reveal} question={question} />
+          </>
+        );
         break;
       case "leaderboard":
         body = <RankView score={score} leaderboard={leaderboard} />;
@@ -276,7 +282,14 @@ function QuestionView({
   const picked = sub.kind === "sending" || sub.kind === "sent" ? sub.choice : null;
   const secs = remainingSeconds(state.endsAt, now);
   return (
-    <div className="player-question" data-locked={locked || undefined} data-leadin={leadIn || undefined}>
+    <div
+      className="player-question"
+      data-locked={locked || undefined}
+      data-leadin={leadIn || undefined}
+      data-double={question.double || undefined}
+    >
+      {/* 2× questions: a soft pulsing tint around the screen edge (decorative) */}
+      {question.double && <span className="double-edge" aria-hidden="true" />}
       <div className="player-question__top">
         <span className="chip">{t("player.questionN", { n: state.qIndex + 1 })}</span>
         {question.double && <DoubleBadge className="double-badge--phone" />}
@@ -353,6 +366,20 @@ function useVerdictBuzz(verdict: "correct" | "wrong" | "noAnswer", qIndex: numbe
   }, [verdict, qIndex]);
 }
 
+/**
+ * Correct answer: a full-screen colour flash plus shape confetti. Rendered beside (not inside)
+ * .verdict, whose entry transform would otherwise confine these fixed layers to its box.
+ */
+function VerdictCelebration({ score }: { score: PlayerScore | null | undefined }) {
+  if (!score?.lastAnswered || !score.lastCorrect) return null;
+  return (
+    <>
+      <span className="verdict-flash" aria-hidden="true" />
+      <Confetti count={18} startMs={250} loops={1} className="confetti--phone" />
+    </>
+  );
+}
+
 function RevealView({
   score,
   reveal,
@@ -370,8 +397,9 @@ function RevealView({
   const pointsText = t("player.points", { points: score.lastDelta });
   // split "+{points} puan" around the number so the number can count up in CSS
   const [before = "", after = ""] = t("player.points", { points: "\u0000" }).split("\u0000");
+  const hot = score.lastCorrect && isHotStreak(score.streak);
   return (
-    <div className={`verdict verdict--${verdict} center`} role="status">
+    <div className={`verdict verdict--${verdict} center`} role="status" data-hot={hot || undefined}>
       <span className="verdict__icon" aria-hidden="true">
         {verdict === "correct" && (
           <span className="verdict__burst">
@@ -411,7 +439,7 @@ function RevealView({
           <span className="countup__unit">{after}</span>
         </span>
       </p>
-      {score.lastCorrect && score.streak >= 2 && <StreakBadge streak={score.streak} />}
+      {score.lastCorrect && score.streak >= 2 && <StreakBadge streak={score.streak} hot={hot} />}
       {!score.lastCorrect && correctText !== undefined && reveal && (
         <p className="verdict__answer" data-choice={reveal.correct}>
           <ChoiceShape index={reveal.correct} />
@@ -446,7 +474,7 @@ function RankView({
       <p className="rank__score">{t("player.score", { score: score.score })}</p>
       <MoveLine score={score} />
       <GapLine score={score} />
-      {score.streak >= 2 && <StreakBadge streak={score.streak} />}
+      {score.streak >= 2 && <StreakBadge streak={score.streak} hot={isHotStreak(score.streak)} />}
     </div>
   );
 }

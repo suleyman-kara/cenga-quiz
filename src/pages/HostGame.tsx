@@ -29,6 +29,9 @@ import { Leaderboard } from "../components/Leaderboard";
 import { DoubleBadge } from "../components/DoubleBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Podium } from "../components/Podium";
+import { Confetti } from "../components/Confetti";
+import { StageBackdrop } from "../components/StageBackdrop";
+import { choiceForId, someoneCorrect, tiltForId } from "../host/stageMoments";
 import { JoinQr, joinUrl } from "../components/JoinQr";
 import { club } from "../club.config";
 import { hostCall } from "../firebase";
@@ -324,6 +327,7 @@ function BigScreen({ pin }: { pin: string }) {
         ) : undefined
       }
     >
+      <StageBackdrop phase={state?.phase} />
       <div className="stage">
         {computing && (
           <p className="stage__computing" role="status">
@@ -436,14 +440,15 @@ function LobbyStage({
           </div>
         ) : (
           <ul className="name-grid">
-            {players.map((p, i) => (
+            {players.map((p) => (
               <li
                 key={p.uid}
-                data-choice={i % club.choices.length}
+                data-choice={choiceForId(p.uid)}
                 data-masked={p.masked || undefined}
                 data-duplicate={p.duplicate || undefined}
+                style={{ "--tilt": `${tiltForId(p.uid)}deg` } as CSSProperties}
               >
-                <ChoiceShape index={i % club.choices.length} />
+                <ChoiceShape index={choiceForId(p.uid)} />
                 <PlayerLabel player={p} />
                 <KickButton player={p} onKick={onKick} disabled={busy} />
               </li>
@@ -594,7 +599,7 @@ function QuestionStage({
   const share = total > 0 ? Math.min(1, answered / total) : 0;
   const leadIn = now < state.startedAt;
   return (
-    <div className="stage-question">
+    <div className="stage-question" data-double={question.double || undefined}>
       <div className="stage-question__head">
         <div>
           <QuestionHeader state={state} meta={meta} />
@@ -645,10 +650,17 @@ function RevealStage({
 }) {
   if (!question || !reveal) return <Loading />;
   const max = Math.max(1, ...reveal.counts);
+  const celebrate = someoneCorrect(reveal);
   return (
-    <div className="stage-reveal">
+    <div className="stage-reveal" data-celebrate={celebrate || undefined}>
+      {celebrate && <Confetti count={24} startMs={900} loops={1} className="confetti--reveal" />}
       <QuestionHeader state={state} meta={meta} />
       <h1 className="stage-question__text">{question.text}</h1>
+      <p className="stage-reveal__verdict" data-celebrate={celebrate || undefined}>
+        {celebrate
+          ? t("hostGame.correctCount", { count: reveal.counts[reveal.correct] ?? 0 })
+          : t("hostGame.nobodyCorrect")}
+      </p>
       <ul className="dist">
         {question.options.map((opt, i) => {
           const count = reveal.counts[i] ?? 0;
@@ -661,7 +673,13 @@ function RevealStage({
               style={{ "--i": i } as CSSProperties}
             >
               <div className="dist__bar-wrap">
-                <span className="dist__count">{count}</span>
+                <span className="dist__count">
+                  <span className="sr-only">{count}</span>
+                  {/* counts tick up in CSS (same technique as the phone's points) */}
+                  <span className="countup" aria-hidden="true">
+                    <span className="countup__n" style={{ "--to": count } as CSSProperties} />
+                  </span>
+                </span>
                 <span className="dist__bar" style={{ height: `${(count / max) * 100}%` }} />
               </div>
               <div className="dist__label">
