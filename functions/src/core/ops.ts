@@ -3,7 +3,7 @@
  * transaction) and returns the multi-path patch to apply to games/{pin}.
  */
 import type { GameState, Phase, Quiz } from "../../../shared/types";
-import { scoreQuestion } from "../../../shared/scoring";
+import { doublePointsApplies, scoreQuestion } from "../../../shared/scoring";
 import { GameError } from "./errors";
 import { assertTransition, type GameAction } from "./transitions";
 import {
@@ -53,6 +53,11 @@ function idleState(phase: Phase, qIndex: number, now: number): GameState {
   return { phase, qIndex, startedAt: 0, endsAt: 0, updatedAt: now };
 }
 
+function showQuestion(quiz: Quiz, index: number, ctx: OpContext): Patch {
+  const { defaultQuestionSeconds, leadInMs, doublePointsLastN } = ctx.config;
+  return questionPatch(quiz, index, ctx.now, defaultQuestionSeconds, leadInMs, doublePointsLastN);
+}
+
 export function planStart(room: Room | null | undefined, ctx: OpContext): Patch {
   const r = guard(room, ctx, "start");
   const quiz = needQuiz(ctx);
@@ -71,7 +76,7 @@ export function planStart(room: Room | null | undefined, ctx: OpContext): Patch 
   for (const [uid, name] of Object.entries(sanitizePlayerNames(keptPlayers, ctx.namePrefix ?? "Oyuncu"))) {
     patch[`players/${uid}`] = { name, joinedAt: players[uid].joinedAt };
   }
-  return { ...patch, ...questionPatch(quiz, 0, ctx.now, ctx.config.defaultQuestionSeconds, ctx.config.leadInMs) };
+  return { ...patch, ...showQuestion(quiz, 0, ctx) };
 }
 
 export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch {
@@ -94,6 +99,7 @@ export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch
     prevScores: r.scores ?? {},
     rules: { maxPoints: config.maxPoints, streakBonus: config.streakBonus },
     leaderboardSize: config.leaderboardSize,
+    multiplier: doublePointsApplies(qIndex, quiz.questions.length, config.doublePointsLastN) ? 2 : 1,
   });
   return {
     ...purgeInactivePlayers(r),
@@ -114,7 +120,7 @@ export function planNext(room: Room | null | undefined, ctx: OpContext): Patch {
   const quiz = needQuiz(ctx);
   const next = r.state.qIndex + 1;
   if (next >= quiz.questions.length) throw new GameError("failed-precondition", "Başka soru kalmadı.");
-  return questionPatch(quiz, next, ctx.now, ctx.config.defaultQuestionSeconds, ctx.config.leadInMs);
+  return showQuestion(quiz, next, ctx);
 }
 
 export function planEnd(room: Room | null | undefined, ctx: OpContext): Patch {
@@ -144,7 +150,8 @@ export function planKickMany(room: Room | null | undefined, ctx: OpContext, targ
     for (const row of rows) {
       if (scores[row.uid] && scores[row.uid].rank !== row.rank) patch[`scores/${row.uid}/rank`] = row.rank;
     }
-    patch.leaderboard = leaderboardFrom(rows, ctx.config.leaderboardSize);
+    // movement / streak of the last scored question stay on the rebuilt board
+    patch.leaderboard = leaderboardFrom(rows, ctx.config.leaderboardSize, scores);
   }
   return patch;
 }

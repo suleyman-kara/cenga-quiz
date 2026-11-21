@@ -11,3 +11,15 @@ export function GapLine({ score }: { score: PlayerScore }) {
   }
   return null;
 }
+
+/** "▲ 2 sıra yükseldin" / "▼ 1 sıra düştün" — nothing when unchanged or unknown (no prevRank). */
+export function MoveLine({ score }: { score: PlayerScore }) {
+  if (typeof score.prevRank !== "number" || score.prevRank <= 0) return null;
+  const move = score.prevRank - score.rank;
+  if (move === 0) return null;
+  return (
+    <p className={`move move--${move > 0 ? "up" : "down"}`}>
+      {t(move > 0 ? "player.movedUp" : "player.movedDown", { count: Math.abs(move) })}
+    </p>
+  );
+}

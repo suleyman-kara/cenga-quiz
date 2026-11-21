@@ -137,7 +137,7 @@ describe("planReveal", () => {
     expect(out.scores?.p2).toMatchObject({ score: 0, lastAnswered: true, lastCorrect: false, rank: 2 });
     expect(out.leaderboard).toEqual({
       top: [
-        { name: "Ali", score: 950, rank: 1, correctCount: 1 },
+        { name: "Ali", score: 950, rank: 1, correctCount: 1, streak: 1 },
         { name: "Ayşe", score: 0, rank: 2, correctCount: 0 },
       ],
       playerCount: 2,
@@ -164,6 +164,57 @@ describe("planReveal", () => {
 
   it("refuses outside the question phase", () => {
     expect(errCode(() => planReveal(lobbyRoom(), { ...host, now: 1 }))).toBe("failed-precondition");
+  });
+
+  it("second question: scores and leaderboard carry prevRank and streak (movement)", () => {
+    const q1 = revealed(); // p1 950 (rank 1), p2 0 (rank 2)
+    const q2 = applyPatch(q1, planNext(q1, { ...host, now: 30_000 })) as Room;
+    // Q2 (correct 0): p2 instantly right, p1 wrong → p2 1000, p1 950
+    const answered = applyPatch(q2, {
+      "answers/1/p1": { choice: 1, at: 30_000 },
+      "answers/1/p2": { choice: 0, at: 30_000 },
+    }) as Room;
+    const out = applyPatch(answered, planReveal(answered, { ...host, now: 31_000 })) as Room;
+    expect(out.scores?.p2).toMatchObject({ rank: 1, prevRank: 2, streak: 1 });
+    expect(out.scores?.p1).toMatchObject({ rank: 2, prevRank: 1, streak: 0 });
+    expect(out.leaderboard?.top).toEqual([
+      { name: "Ayşe", score: 1000, rank: 1, correctCount: 1, prevRank: 2, streak: 1 },
+      { name: "Ali", score: 950, rank: 2, correctCount: 1, prevRank: 1 },
+    ]);
+  });
+
+  it("double points: the last N questions multiply the whole delta by 2", () => {
+    const dbl = { ...host, config: { ...config, doublePointsLastN: 1 } };
+    const r0 = lobbyRoom();
+    const s0 = applyPatch(r0, planStart(r0, { ...dbl, now: 10_000 })) as Room;
+    // Q1 (of 2) is not doubled
+    const a0 = applyPatch(s0, { "answers/0/p1": { choice: 2, at: 10_000 } }) as Room;
+    const q1 = applyPatch(a0, planReveal(a0, { ...dbl, now: 20_000 })) as Room;
+    expect(q1.scores?.p1.lastDelta).toBe(1000);
+    // Q2 is doubled: (1000 + 40 streak bonus) × 2
+    const s1 = applyPatch(q1, planNext(q1, { ...dbl, now: 30_000 })) as Room;
+    const a1 = applyPatch(s1, { "answers/1/p1": { choice: 0, at: 30_000 } }) as Room;
+    const q2 = applyPatch(a1, planReveal(a1, { ...dbl, now: 60_000 })) as Room;
+    expect(q2.scores?.p1).toMatchObject({ lastDelta: 2080, score: 3080, streak: 2 });
+  });
+});
+
+describe("double points on the public question", () => {
+  it("marks only the last N questions with double: true (key omitted otherwise)", () => {
+    const dbl = { ...host, config: { ...config, doublePointsLastN: 1 } };
+    const r0 = lobbyRoom();
+    const s0 = applyPatch(r0, planStart(r0, { ...dbl, now: 10_000 })) as Room;
+    expect(s0.question && "double" in s0.question).toBe(false);
+    const rev = applyPatch(s0, { "state/phase": "reveal" }) as Room;
+    const s1 = applyPatch(rev, planNext(rev, { ...dbl, now: 30_000 })) as Room;
+    expect(s1.question).toMatchObject({ index: 1, double: true });
+  });
+  it("0 disables it", () => {
+    const r0 = lobbyRoom();
+    const s0 = applyPatch(r0, planStart(r0, { ...host, now: 10_000 })) as Room;
+    const rev = applyPatch(s0, { "state/phase": "reveal" }) as Room;
+    const s1 = applyPatch(rev, planNext(rev, { ...host, now: 30_000 })) as Room;
+    expect(s1.question && "double" in s1.question).toBe(false);
   });
 });
 
@@ -241,6 +292,20 @@ describe("planKick", () => {
     const out = applyPatch(r, planKick(r, { ...host, now: 1 }, "p1")) as Room;
     expect(out.leaderboard).toEqual({ top: [{ name: "Ayşe", score: 0, rank: 1, correctCount: 0 }], playerCount: 1 });
     expect(out.scores?.p2.rank).toBe(1);
+  });
+  it("the rebuilt leaderboard keeps streak / prevRank of the last scored question", () => {
+    const r = applyPatch(revealed(), {
+      "players/p3": { name: "Can", joinedAt: 1600 },
+      "scores/p1/prevRank": 2,
+      "scores/p3": { score: 10, streak: 0, rank: 2, prevRank: 1, lastDelta: 0, lastCorrect: false, lastAnswered: true, correctCount: 0 },
+    }) as Room;
+    const out = applyPatch(r, planKick(r, { ...host, now: 1 }, "p2")) as Room;
+    expect(out.leaderboard?.top).toEqual([
+      { name: "Ali", score: 950, rank: 1, correctCount: 1, prevRank: 2, streak: 1 },
+      { name: "Can", score: 10, rank: 2, correctCount: 0, prevRank: 1 },
+    ]);
+    // no undefined values anywhere in the patch
+    expect(JSON.stringify(out.leaderboard)).not.toContain("null");
   });
   it("works in the lobby (no leaderboard written) and for unknown uids", () => {
     const patch = planKick(lobbyRoom(), { ...host, now: 1 }, "ghost");

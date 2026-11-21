@@ -8,6 +8,7 @@ export const config: GameConfig = {
   leaderboardSize: 2,
   maxPlayers: 3,
   leadInMs: 0,
+  doublePointsLastN: 0,
 };
 
 export const quiz: Quiz = {

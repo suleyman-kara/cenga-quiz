@@ -6,6 +6,7 @@ import {
   scoreQuestion,
   rankScores,
   emptyScore,
+  doublePointsApplies,
   type ScoringRules,
   type ScoreQuestionInput,
 } from "./scoring";
@@ -225,6 +226,11 @@ describe("rankScores", () => {
   it("handles empty input", () => {
     expect(rankScores({}, {})).toEqual({});
   });
+
+  it("drops a stale prevRank from the previous ranking", () => {
+    const r = rankScores({ a: score({ score: 10, rank: 1, prevRank: 3 }) }, players);
+    expect("prevRank" in r.a).toBe(false);
+  });
 });
 
 describe("scoreQuestion", () => {
@@ -263,6 +269,7 @@ describe("scoreQuestion", () => {
       score: 1800,
       streak: 0,
       rank: 1,
+      prevRank: 1,
       lastDelta: 0,
       lastCorrect: false,
       lastAnswered: true,
@@ -464,8 +471,8 @@ describe("scoreQuestion", () => {
     expect(res.leaderboard).toEqual({
       top: [
         { name: "Cem", score: 1500, rank: 1, correctCount: 0 },
-        { name: "Bora", score: 1100, rank: 2, correctCount: 1 },
-        { name: "Ayşe", score: 1000, rank: 3, correctCount: 1 },
+        { name: "Bora", score: 1100, rank: 2, correctCount: 1, streak: 1 },
+        { name: "Ayşe", score: 1000, rank: 3, correctCount: 1, streak: 1 },
       ],
       playerCount: 4,
     });
@@ -517,5 +524,96 @@ describe("scoreQuestion", () => {
     r = scoreQuestion(input({ players, answers: { b: ans(3, 0) }, correct: 3, prevScores: prev }));
     expect(r.scores.a).toMatchObject({ score: 2040, streak: 0, correctCount: 2, rank: 1, lastAnswered: false });
     expect(r.scores.b).toMatchObject({ score: 1500, streak: 1, correctCount: 2, rank: 2, lastDelta: 1000 });
+  });
+
+  it("records each player's rank before the question as prevRank (score and leaderboard)", () => {
+    const players = { a: player("A"), b: player("B"), c: player("C") };
+    const res = scoreQuestion(
+      input({
+        players,
+        answers: { c: ans(0, 0), b: ans(0, DUR) },
+        prevScores: {
+          a: score({ score: 900, rank: 1 }),
+          b: score({ score: 600, rank: 2 }),
+          c: score({ score: 100, rank: 3 }),
+        },
+      }),
+    );
+    // a 900, b 1100, c 1100 → b,c rank 1, a rank 3
+    expect(res.scores.a).toMatchObject({ rank: 3, prevRank: 1 });
+    expect(res.scores.b).toMatchObject({ rank: 1, prevRank: 2 });
+    expect(res.scores.c).toMatchObject({ rank: 1, prevRank: 3 });
+    expect(res.leaderboard.top).toEqual([
+      { name: "B", score: 1100, rank: 1, correctCount: 1, prevRank: 2, streak: 1 },
+      { name: "C", score: 1100, rank: 1, correctCount: 1, prevRank: 3, streak: 1 },
+      { name: "A", score: 900, rank: 3, correctCount: 0, prevRank: 1 },
+    ]);
+  });
+
+  it("omits prevRank when unknown (first question / rank 0) — never writes undefined", () => {
+    const players = { a: player("A"), b: player("B") };
+    const res = scoreQuestion(input({ players, answers: { a: ans(0, 0) }, prevScores: { b: score({ rank: 0 }) } }));
+    for (const s of Object.values(res.scores)) expect("prevRank" in s).toBe(false);
+    for (const e of res.leaderboard.top) {
+      expect("prevRank" in e).toBe(false);
+      expect(Object.values(e).includes(undefined)).toBe(false);
+    }
+    // streak only for players on one (0 is omitted)
+    expect(res.leaderboard.top.find((e) => e.name === "B")).not.toHaveProperty("streak");
+  });
+
+  it("leaderboard entries carry the current streak", () => {
+    const players = { a: player("A") };
+    const res = scoreQuestion(input({ players, answers: { a: ans(0, 0) }, prevScores: { a: score({ streak: 3, rank: 1 }) } }));
+    expect(res.leaderboard.top[0]).toMatchObject({ streak: 4, prevRank: 1 });
+  });
+
+  it("multiplier doubles the whole delta (speed points + streak bonus)", () => {
+    const players = { a: player("A"), b: player("B") };
+    const res = scoreQuestion(
+      input({
+        players,
+        answers: { a: ans(0, 0), b: ans(0, DUR / 2) },
+        prevScores: { a: score({ score: 100, streak: 1 }), b: score({ score: 50 }) },
+        multiplier: 2,
+      }),
+    );
+    expect(res.scores.a).toMatchObject({ lastDelta: 2 * (1000 + 40), score: 100 + 2080, streak: 2 });
+    expect(res.scores.b).toMatchObject({ lastDelta: 1500, score: 1550, streak: 1 });
+  });
+
+  it("multiplier defaults to 1; wrong answers stay at 0; invalid multipliers fall back to 1", () => {
+    const players = { a: player("A"), b: player("B") };
+    const answers = { a: ans(0, 0), b: ans(1, 0) };
+    expect(scoreQuestion(input({ players, answers })).scores.a.lastDelta).toBe(1000);
+    const doubled = scoreQuestion(input({ players, answers, multiplier: 2 }));
+    expect(doubled.scores.b.lastDelta).toBe(0);
+    for (const m of [0, -2, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(scoreQuestion(input({ players, answers, multiplier: m })).scores.a.lastDelta).toBe(1000);
+    }
+  });
+});
+
+describe("doublePointsApplies", () => {
+  it("covers the last N questions", () => {
+    const hits = Array.from({ length: 10 }, (_, q) => doublePointsApplies(q, 10, 3));
+    expect(hits).toEqual([false, false, false, false, false, false, false, true, true, true]);
+  });
+
+  it("0 (or negative / non-finite) disables it", () => {
+    for (const n of [0, -1, Number.NaN]) {
+      expect(Array.from({ length: 5 }, (_, q) => doublePointsApplies(q, 5, n)).some(Boolean)).toBe(false);
+    }
+  });
+
+  it("short quizzes: at most half of the questions (rounded down) are doubled", () => {
+    expect(Array.from({ length: 4 }, (_, q) => doublePointsApplies(q, 4, 3))).toEqual([false, false, true, true]);
+    expect(Array.from({ length: 3 }, (_, q) => doublePointsApplies(q, 3, 3))).toEqual([false, false, true]);
+    expect(doublePointsApplies(0, 1, 3)).toBe(false);
+  });
+
+  it("out-of-range indexes are never doubled", () => {
+    expect(doublePointsApplies(10, 10, 3)).toBe(false);
+    expect(doublePointsApplies(-1, 10, 3)).toBe(false);
   });
 });

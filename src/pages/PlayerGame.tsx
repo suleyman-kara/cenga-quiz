@@ -22,7 +22,8 @@ import { ChoiceShape } from "../components/ChoiceShape";
 import { Countdown, remaining, remainingSeconds } from "../components/Countdown";
 import { Loading } from "../components/Loading";
 import { StreakBadge } from "../components/StreakBadge";
-import { GapLine } from "../components/GapLine";
+import { GapLine, MoveLine } from "../components/GapLine";
+import { DoubleBadge } from "../components/DoubleBadge";
 import { Leaderboard as LeaderboardList } from "../components/Leaderboard";
 import { club } from "../club.config";
 import { t } from "../i18n";
@@ -278,6 +279,7 @@ function QuestionView({
     <div className="player-question" data-locked={locked || undefined} data-leadin={leadIn || undefined}>
       <div className="player-question__top">
         <span className="chip">{t("player.questionN", { n: state.qIndex + 1 })}</span>
+        {question.double && <DoubleBadge className="double-badge--phone" />}
         {!leadIn && <Countdown endsAt={state.endsAt} totalSeconds={question.seconds} serverNow={now} />}
       </div>
       <span className="sr-only" aria-live="polite" data-countdown-announcer>
@@ -409,6 +411,7 @@ function RevealView({
         <p>{t("player.rank", { rank: score.rank })}</p>
         <p>{t("player.score", { score: score.score })}</p>
       </div>
+      <MoveLine score={score} />
       <GapLine score={score} />
     </div>
   );
@@ -430,6 +433,7 @@ function RankView({
       <h1 className="headline">{t("player.rank", { rank: score.rank })}</h1>
       {leaderboard && <p className="muted">{t("player.ofPlayers", { count: leaderboard.playerCount })}</p>}
       <p className="rank__score">{t("player.score", { score: score.score })}</p>
+      <MoveLine score={score} />
       <GapLine score={score} />
       {score.streak >= 2 && <StreakBadge streak={score.streak} />}
     </div>

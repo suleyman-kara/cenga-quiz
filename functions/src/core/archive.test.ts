@@ -39,6 +39,16 @@ describe("buildGameResult", () => {
     });
   });
 
+  it("never carries a stored prevRank / streak into the archived results", () => {
+    const room: Room = {
+      ...lobbyRoom({ p1: "Ali" }),
+      scores: { p1: { ...s(500, 1), streak: 2, rank: 1, prevRank: 3 } },
+    };
+    expect(buildGameResult(room, { pin: "1", now: 1, retentionDays: 1 }).results).toEqual([
+      { uid: "p1", name: "Ali", score: 500, rank: 1, correctCount: 1 },
+    ]);
+  });
+
   it("handles a room without players", () => {
     const doc = buildGameResult(lobbyRoom({}), { pin: "123456", now: 1, retentionDays: 365 });
     expect(doc.results).toEqual([]);

@@ -1388,3 +1388,51 @@
 .editor .btn--ghost.btn--danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 }
+
+/* Sıra değişimi: "▲ 2 sıra yükseldin" / "▼ 1 sıra düştün" */
+.move {
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  text-align: center;
+  animation: shape-pop 0.5s 0.5s var(--ease-spring) both;
+}
+
+.move--up {
+  color: color-mix(in srgb, var(--color-accent) 60%, var(--color-text));
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+}
+
+.move--down {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface));
+}
+
+/* Çift puan rozeti (son N soru) */
+.double-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font: 900 0.95rem / 1 var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--color-on-primary);
+  background: linear-gradient(110deg, var(--color-primary-bright), var(--color-primary) 60%, var(--color-primary-dark));
+  box-shadow: 0 0 0 3px var(--color-accent);
+  animation: double-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes double-pulse {
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .move,
+  .double-badge {
+    animation: none;
+  }
+}

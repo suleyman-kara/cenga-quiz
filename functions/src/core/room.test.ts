@@ -50,6 +50,12 @@ describe("publicQuestion", () => {
   it("omits imageUrl when absent", () => {
     expect(publicQuestion(quiz, 0, 20)).toEqual({ index: 0, text: "S1", options: ["a", "b", "c", "d"], seconds: 10 });
   });
+  it("double: true only for the last N questions (clamped to half the quiz); omitted otherwise", () => {
+    expect(publicQuestion(quiz, 1, 20, 3)).toMatchObject({ index: 1, double: true });
+    expect("double" in publicQuestion(quiz, 0, 20, 3)).toBe(false);
+    expect("double" in publicQuestion(quiz, 1, 20, 0)).toBe(false);
+    expect("double" in publicQuestion(quiz, 1, 20)).toBe(false);
+  });
 });
 
 describe("questionPatch", () => {
@@ -66,6 +72,9 @@ describe("questionPatch", () => {
     const p = questionPatch(quiz, 0, 10_000, 20, 3000);
     expect(p.state).toEqual({ phase: "question", qIndex: 0, startedAt: 13_000, endsAt: 23_000, updatedAt: 10_000 });
     expect(p.question).toMatchObject({ index: 0, text: "S1" });
+  });
+  it("passes doublePointsLastN to the public question", () => {
+    expect(questionPatch(quiz, 1, 10_000, 20, 0, 1).question).toMatchObject({ index: 1, double: true });
   });
 });
 

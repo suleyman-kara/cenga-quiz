@@ -10,6 +10,7 @@ import type {
   RevealData,
 } from "../../../shared/types";
 import { questionSeconds } from "../../../shared/quizValidate";
+import { doublePointsApplies } from "../../../shared/scoring";
 
 /** Subset of club.game used by the server. */
 export interface GameConfig {
@@ -20,6 +21,8 @@ export interface GameConfig {
   maxPlayers: number;
   /** question published this long before its clock starts (state.startedAt) */
   leadInMs: number;
+  /** the last N questions give double points (0 = off; at most half of the quiz) */
+  doublePointsLastN: number;
 }
 
 /** games/{pin} as read from RTDB (every node optional). */
@@ -101,8 +104,11 @@ export function newRoom(meta: GameMeta, now: number): Room {
   return { meta, state: lobbyState(now) };
 }
 
-/** The players' view of a question — never includes the correct index. */
-export function publicQuestion(quiz: Quiz, index: number, defaultSeconds: number): PublicQuestion {
+/**
+ * The players' view of a question — never includes the correct index. `double: true` marks one
+ * of the last `doublePointsLastN` questions (see doublePointsApplies); omitted otherwise.
+ */
+export function publicQuestion(quiz: Quiz, index: number, defaultSeconds: number, doublePointsLastN = 0): PublicQuestion {
   const q = quiz.questions[index];
   const pq: PublicQuestion = {
     index,
@@ -111,6 +117,7 @@ export function publicQuestion(quiz: Quiz, index: number, defaultSeconds: number
     seconds: questionSeconds(q, defaultSeconds),
   };
   if (q.imageUrl) pq.imageUrl = q.imageUrl;
+  if (doublePointsApplies(index, quiz.questions.length, doublePointsLastN)) pq.double = true;
   return pq;
 }
 
@@ -118,8 +125,15 @@ export function publicQuestion(quiz: Quiz, index: number, defaultSeconds: number
  * One multi-path update that shows question `index`. The question is published now; the clock
  * (and answer acceptance, see rules) starts `leadInMs` later so every phone has it first.
  */
-export function questionPatch(quiz: Quiz, index: number, now: number, defaultSeconds: number, leadInMs = 0): Patch {
-  const question = publicQuestion(quiz, index, defaultSeconds);
+export function questionPatch(
+  quiz: Quiz,
+  index: number,
+  now: number,
+  defaultSeconds: number,
+  leadInMs = 0,
+  doublePointsLastN = 0,
+): Patch {
+  const question = publicQuestion(quiz, index, defaultSeconds, doublePointsLastN);
   const startedAt = now + Math.max(0, leadInMs);
   const state: GameState = {
     phase: "question",

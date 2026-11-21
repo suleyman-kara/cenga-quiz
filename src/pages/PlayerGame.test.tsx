@@ -403,4 +403,48 @@ describe("PlayerGame", () => {
       expect(await screen.findByText(t("player.answerLocked"))).toBeInTheDocument();
     });
   });
+
+  it("reveal: says how many places the player moved up", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ rank: 3, prevRank: 5 }));
+    renderPlay();
+    expect(screen.getByText(t("player.movedUp", { count: 2 }))).toBeInTheDocument();
+  });
+
+  it("leaderboard: says how many places the player moved down", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("leaderboard"));
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ rank: 4, prevRank: 3 }));
+    renderPlay();
+    expect(screen.getByText(t("player.movedDown", { count: 1 }))).toBeInTheDocument();
+  });
+
+  it("no movement line when the rank is unchanged or unknown", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("leaderboard"));
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ rank: 3, prevRank: 3 }));
+    const { unmount } = renderPlay();
+    expect(screen.queryByText(/▲|▼/)).not.toBeInTheDocument();
+    unmount();
+    vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+    vi.mocked(hooks.useMyScore).mockReturnValue(score({ rank: 3 }));
+    renderPlay();
+    expect(screen.queryByText(/▲|▼/)).not.toBeInTheDocument();
+  });
+
+  it("double-points question: shows the 2× badge (lead-in and answering)", () => {
+    vi.mocked(hooks.useQuestion).mockReturnValue({ ...question, double: true });
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...state("question"), startedAt: 7_000, endsAt: 27_000 });
+    vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
+    const { unmount } = renderPlay();
+    expect(screen.getByText(t("question.double"))).toBeInTheDocument();
+    unmount();
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    renderPlay();
+    expect(screen.getByText(t("question.double"))).toBeInTheDocument();
+  });
+
+  it("normal question: no 2× badge", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    renderPlay();
+    expect(screen.queryByText(t("question.double"))).not.toBeInTheDocument();
+  });
 });

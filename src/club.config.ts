@@ -99,6 +99,11 @@ export interface ClubConfig {
      * Ağ gecikmesi farklı oyuncular arasında adaletsizlik yaratmasın diye.
      */
     leadInMs: number;
+    /**
+     * Son N soru çift puan verir (hız puanı + seri bonusu × 2); ekranda "2× PUAN" rozeti çıkar.
+     * 0 = kapalı. Kısa quizlerde en fazla soruların yarısı (aşağı yuvarlanır) çift puanlıdır.
+     */
+    doublePointsLastN: number;
     /** Oyun sonuçları (gameResults) bu kadar gün sonra Firestore TTL ile silinir (expireAt alanı) */
     resultsRetentionDays: number;
   };
@@ -197,6 +202,7 @@ export const club: ClubConfig = {
     maxPlayers: 300,
     abandonedAfterHours: 6,
     leadInMs: 3000,
+    doublePointsLastN: 3,
     resultsRetentionDays: 365,
   },
 };

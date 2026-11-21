@@ -139,6 +139,8 @@ export interface PublicQuestion {
   options: string[];
   seconds: number;
   imageUrl?: string;
+  /** one of the last club.game.doublePointsLastN questions: points × 2 (absent otherwise) */
+  double?: true;
 }
 
 export interface RevealData {
@@ -166,6 +168,8 @@ export interface PlayerScore {
   streak: number;
   /** 1-based competition rank (ties share rank) */
   rank: number;
+  /** rank before the last revealed question (absent when unknown, e.g. after the first question) */
+  prevRank?: number;
   /** points gained on the last revealed question (incl. streak bonus) */
   lastDelta: number;
   lastCorrect: boolean;
@@ -186,6 +190,10 @@ export interface LeaderboardEntry {
   rank: number;
   /** correct answers so far (detailed lists); optional for older rooms */
   correctCount?: number;
+  /** rank before the last scored question (absent when unknown) — movement arrows */
+  prevRank?: number;
+  /** current streak of consecutive correct answers (absent when 0) */
+  streak?: number;
 }
 
 export interface Leaderboard {

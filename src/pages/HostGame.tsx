@@ -25,6 +25,7 @@ import { ChoiceShape } from "../components/ChoiceShape";
 import { Countdown, remainingSeconds } from "../components/Countdown";
 import { Loading } from "../components/Loading";
 import { Leaderboard } from "../components/Leaderboard";
+import { DoubleBadge } from "../components/DoubleBadge";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Podium } from "../components/Podium";
 import { JoinQr, joinUrl } from "../components/JoinQr";
@@ -223,7 +224,7 @@ function BigScreen({ pin }: { pin: string }) {
           <div className="stage-board stack">
             <QuestionHeader state={state} meta={meta} />
             <h1 className="stage-title">{t("leaderboard.title")}</h1>
-            <Leaderboard entries={leaderboard?.top ?? []} limit={club.game.leaderboardSize} />
+            <Leaderboard entries={leaderboard?.top ?? []} limit={club.game.leaderboardSize} movement />
           </div>
         );
         controls = (
@@ -593,6 +594,7 @@ function QuestionStage({
       <div className="stage-question__head">
         <div>
           <QuestionHeader state={state} meta={meta} />
+          {question.double && <DoubleBadge className="double-badge--stage" />}
           <h1 className="stage-question__text">{question.text}</h1>
         </div>
         {leadIn ? (

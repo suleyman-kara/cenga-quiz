@@ -1186,3 +1186,145 @@ li[data-duplicate] {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* ---------- sıralama: yer değiştirme (FLIP), ▲/▼ göstergesi, seri rozeti ---------- */
+.leaderboard--moves {
+  --lb-gap: 10px;
+}
+
+.leaderboard--moves.leaderboard--dense {
+  --lb-gap: 6px;
+}
+
+.leaderboard--moves .leaderboard__row {
+  grid-template-columns: 3.4rem 1fr auto auto;
+  /* satır önceki yerinden (--shift satır) yeni yerine kayar; görünme yalnızca opaklıkla */
+  animation:
+    row-fade 0.35s var(--ease-out) both,
+    row-move 0.9s 0.45s var(--ease-out) both;
+}
+
+.leaderboard--moves.leaderboard--detailed .leaderboard__row {
+  grid-template-columns: 3.4rem 1fr auto auto auto;
+}
+
+/* yükselenler kayarken diğerlerinin üstünde kalsın */
+.leaderboard--moves .leaderboard__row[data-move="up"] {
+  z-index: 2;
+}
+
+@keyframes row-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes row-move {
+  from {
+    transform: translateY(calc(var(--shift, 0) * (100% + var(--lb-gap))));
+  }
+}
+
+.leaderboard__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.leaderboard__move {
+  font: 800 0.8em / 1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  animation: move-pop 0.45s 1.2s var(--ease-out) both;
+}
+
+.leaderboard__move--up {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.leaderboard__move--down {
+  color: color-mix(in srgb, var(--color-danger) 70%, var(--color-on-stage));
+  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
+}
+
+/* lider satırı marka renginde: göstergeler okunur kalsın */
+.leaderboard__row[data-rank="1"] .leaderboard__move {
+  color: var(--color-primary);
+  background: var(--color-on-primary);
+}
+
+.leaderboard__streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary-bright) 22%, transparent);
+  font: 800 0.75em / 1 var(--font-display);
+  white-space: nowrap;
+  animation: move-pop 0.45s 1.35s var(--ease-out) both;
+}
+
+.leaderboard__streak svg {
+  width: 1.2em;
+  height: 1.2em;
+  fill: var(--color-primary-bright);
+}
+
+.leaderboard__row[data-rank="1"] .leaderboard__streak {
+  background: var(--color-on-primary);
+  color: var(--color-primary);
+}
+
+@keyframes move-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leaderboard--moves .leaderboard__row,
+  .leaderboard__move,
+  .leaderboard__streak {
+    animation: none;
+  }
+}
+
+/* ---------- çift puan rozeti ---------- */
+.double-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 6px 18px;
+  border-radius: 999px;
+  font: 900 1rem / 1 var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--color-on-primary);
+  background: linear-gradient(110deg, var(--color-primary-bright), var(--color-primary) 60%, var(--color-primary-dark));
+  box-shadow: 0 0 0 3px var(--color-accent);
+  animation: double-pulse 1.6s ease-in-out infinite;
+}
+
+.double-badge--stage {
+  font-size: clamp(1.4rem, 2.6vw, 2.4rem);
+  padding: 10px 28px;
+  margin: 10px 0 4px;
+}
+
+@keyframes double-pulse {
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .double-badge {
+    animation: none;
+  }
+}

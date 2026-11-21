@@ -519,5 +519,66 @@ describe("HostGame", () => {
     expect(screen.getByText(club.finalScreen[club.locale].title)).toBeInTheDocument();
     expect(screen.getByAltText(club.logo.alt)).toBeInTheDocument();
   });
-});
 
+  it("leaderboard: rows show movement (▲ up / ▼ down / nothing) and a streak badge from 2", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(1), phase: "leaderboard" });
+    vi.mocked(hooks.useLeaderboard).mockReturnValue({
+      top: [
+        { name: "Ali", score: 900, rank: 1, prevRank: 4, streak: 3 },
+        { name: "Veli", score: 800, rank: 2, prevRank: 1, streak: 1 },
+        { name: "Can", score: 700, rank: 3, prevRank: 3 },
+        { name: "Yeni", score: 600, rank: 4 },
+      ],
+      playerCount: 4,
+    });
+    renderHost();
+    const rows = within(screen.getByRole("list", { name: t("leaderboard.title") })).getAllByRole("listitem");
+    expect(within(rows[0]).getByText("▲3")).toBeInTheDocument();
+    expect(within(rows[0]).getByLabelText(t("leaderboard.movedUp", { count: 3 }))).toBeInTheDocument();
+    expect(within(rows[0]).getByLabelText(t("leaderboard.streak", { streak: 3 }))).toBeInTheDocument();
+    expect(within(rows[1]).getByText("▼1")).toBeInTheDocument();
+    expect(within(rows[1]).getByLabelText(t("leaderboard.movedDown", { count: 1 }))).toBeInTheDocument();
+    // streak 1 → no badge; unchanged / unknown → no arrow
+    expect(within(rows[1]).queryByLabelText(t("leaderboard.streak", { streak: 1 }))).not.toBeInTheDocument();
+    expect(within(rows[2]).queryByText(/[▲▼]/)).not.toBeInTheDocument();
+    expect(within(rows[3]).queryByText(/[▲▼]/)).not.toBeInTheDocument();
+    // FLIP: each row starts from its previous display position (in rows)
+    expect(rows[0].style.getPropertyValue("--shift")).toBe("3");
+    expect(rows[1].style.getPropertyValue("--shift")).toBe("-1");
+    expect(rows[2].style.getPropertyValue("--shift")).toBe("0");
+    expect(rows[3].style.getPropertyValue("--shift")).toBe("0");
+    expect(rows[0]).toHaveAttribute("data-move", "up");
+    expect(rows[1]).toHaveAttribute("data-move", "down");
+    expect(rows[2]).not.toHaveAttribute("data-move");
+  });
+
+  it("ended list has no movement arrows (final standings only)", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(2), phase: "ended" });
+    vi.mocked(hooks.useLeaderboard).mockReturnValue({
+      top: [{ name: "Ali", score: 900, rank: 1, prevRank: 2, streak: 3, correctCount: 3 }],
+      playerCount: 1,
+    });
+    renderHost();
+    const list = screen.getByRole("list", { name: t("ended.topTitle", { count: 10 }) });
+    expect(within(list).queryByText("▲1")).not.toBeInTheDocument();
+  });
+
+  it("double-points question: a 2× badge on the stage, during the lead-in too", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), startedAt: 8_000, endsAt: 28_000 });
+    vi.mocked(hooks.useQuestion).mockReturnValue({ ...question(), double: true });
+    const { unmount } = renderHost();
+    expect(screen.getByText(t("hostGame.getReady"))).toBeInTheDocument();
+    expect(screen.getByText(t("question.double"))).toBeInTheDocument();
+    unmount();
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(), startedAt: 4_000, endsAt: 24_000 });
+    renderHost();
+    expect(screen.getByText(t("question.double"))).toBeInTheDocument();
+  });
+
+  it("normal question: no 2× badge", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState());
+    vi.mocked(hooks.useQuestion).mockReturnValue(question());
+    renderHost();
+    expect(screen.queryByText(t("question.double"))).not.toBeInTheDocument();
+  });
+});

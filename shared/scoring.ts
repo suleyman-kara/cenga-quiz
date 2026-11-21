@@ -61,7 +61,8 @@ export function rankScores(
   let groupStart = 0;
   let prevGroupStart = -1;
   order.forEach((uid, i) => {
-    const { aheadName, aheadGap, leadGap, ...s } = scores[uid];
+    // gap fields and prevRank describe a previous ranking: never carry them over
+    const { aheadName, aheadGap, leadGap, prevRank, ...s } = scores[uid];
     if (s.score !== prevScore) {
       rank = i + 1;
       prevScore = s.score;
@@ -94,12 +95,22 @@ export interface ScoreQuestionInput {
   prevScores: Record<string, PlayerScore>;
   rules: ScoringRules;
   leaderboardSize: number;
+  /** whole delta (speed points + streak bonus) × multiplier; default 1, invalid (≤0, non-finite) → 1 */
+  multiplier?: number;
 }
 
 export interface ScoreQuestionResult {
   scores: Record<string, PlayerScore>;
   counts: number[];
   leaderboard: Leaderboard;
+}
+
+/** Leaderboard row; prevRank / streak only when meaningful (never undefined values). */
+export function leaderboardEntry(name: string, s: PlayerScore): LeaderboardEntry {
+  const e: LeaderboardEntry = { name, score: s.score, rank: s.rank, correctCount: s.correctCount };
+  if (typeof s.prevRank === "number" && s.prevRank > 0) e.prevRank = s.prevRank;
+  if (typeof s.streak === "number" && s.streak > 0) e.streak = s.streak;
+  return e;
 }
 
 function validAnswer(a: unknown, optionCount: number): a is AnswerEntry {
@@ -115,13 +126,32 @@ function validAnswer(a: unknown, optionCount: number): a is AnswerEntry {
   );
 }
 
+/**
+ * Whether question `qIndex` (0-based) of a `questionCount`-question quiz is one of the last
+ * `lastN` "double points" questions. lastN ≤ 0 (or not finite) disables it; short quizzes double
+ * at most half of their questions (rounded down), so a 1-question quiz is never doubled.
+ */
+export function doublePointsApplies(qIndex: number, questionCount: number, lastN: number): boolean {
+  if (!Number.isFinite(lastN) || !Number.isFinite(questionCount) || lastN <= 0) return false;
+  const count = Math.max(0, Math.floor(questionCount));
+  const n = Math.min(Math.floor(lastN), Math.floor(count / 2));
+  return n > 0 && Number.isInteger(qIndex) && qIndex >= count - n && qIndex < count;
+}
+
 export function scoreQuestion(input: ScoreQuestionInput): ScoreQuestionResult {
   const { players, answers, correct, optionCount, startedAt, durationMs, prevScores, rules, leaderboardSize } = input;
+  const multiplier =
+    typeof input.multiplier === "number" && Number.isFinite(input.multiplier) && input.multiplier > 0
+      ? input.multiplier
+      : 1;
   const counts: number[] = Array.from({ length: Math.max(0, Math.floor(optionCount)) }, () => 0);
   const next: Record<string, PlayerScore> = {};
+  /** rank before this question; 0 / missing = unknown (first scored question) */
+  const prevRanks: Record<string, number> = {};
 
   for (const uid of Object.keys(players)) {
     const prev = { ...emptyScore(), ...(prevScores?.[uid] ?? {}) };
+    if (typeof prev.rank === "number" && Number.isInteger(prev.rank) && prev.rank > 0) prevRanks[uid] = prev.rank;
     const a = answers?.[uid];
     const answered = validAnswer(a, counts.length);
     let delta = 0;
@@ -135,7 +165,7 @@ export function scoreQuestion(input: ScoreQuestionInput): ScoreQuestionResult {
         if (base > 0) {
           isCorrect = true;
           streak = prev.streak + 1;
-          delta = base + streakBonus(streak, rules);
+          delta = Math.round((base + streakBonus(streak, rules)) * multiplier);
         }
       }
     }
@@ -152,15 +182,12 @@ export function scoreQuestion(input: ScoreQuestionInput): ScoreQuestionResult {
   }
 
   const scores = rankScores(next, players);
+  // prevRank only when known: RTDB rejects undefined values, so the key is omitted instead.
+  for (const [uid, rank] of Object.entries(prevRanks)) if (scores[uid]) scores[uid].prevRank = rank;
   // Order explicitly rather than via object key order (integer-like keys would be reordered by JS).
   const top: LeaderboardEntry[] = orderUids(scores, players)
     .slice(0, Math.max(0, leaderboardSize))
-    .map((uid) => ({
-      name: players[uid].name,
-      score: scores[uid].score,
-      rank: scores[uid].rank,
-      correctCount: scores[uid].correctCount,
-    }));
+    .map((uid) => leaderboardEntry(players[uid].name, scores[uid]));
 
   return { scores, counts, leaderboard: { top, playerCount: Object.keys(players).length } };
 }

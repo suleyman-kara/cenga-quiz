@@ -1,5 +1,5 @@
 import type { GameResultDoc, Leaderboard, PlayerScore } from "../../../shared/types";
-import { emptyScore, rankScores } from "../../../shared/scoring";
+import { emptyScore, leaderboardEntry, rankScores } from "../../../shared/scoring";
 import { activePlayers, type Room } from "./room";
 
 export type ResultRow = GameResultDoc["results"][number];
@@ -17,9 +17,19 @@ export function rankedResults(room: Room): ResultRow[] {
     .sort((a, b) => a.rank - b.rank || cmp(a.name, b.name) || cmp(a.uid, b.uid));
 }
 
-export function leaderboardFrom(rows: ResultRow[], size: number): Leaderboard {
+/**
+ * Top-`size` leaderboard from ranked rows. With `scores` (the stored scores of the last scored
+ * question) each entry keeps that question's prevRank / streak; the rank itself always comes from
+ * `rows`, so a stale stored rank never leaks in.
+ */
+export function leaderboardFrom(rows: ResultRow[], size: number, scores?: Record<string, PlayerScore>): Leaderboard {
   return {
-    top: rows.slice(0, Math.max(0, size)).map(({ name, score, rank, correctCount }) => ({ name, score, rank, correctCount })),
+    top: rows.slice(0, Math.max(0, size)).map(({ uid, name, score, rank, correctCount }) => {
+      const stored = scores?.[uid];
+      return stored
+        ? leaderboardEntry(name, { ...emptyScore(), ...stored, score, rank, correctCount })
+        : { name, score, rank, correctCount };
+    }),
     playerCount: rows.length,
   };
 }
