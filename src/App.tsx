@@ -4,11 +4,15 @@ import { isValidPin } from "../shared/pin";
 import { JoinPage } from "./pages/JoinPage";
 import { PlayerGame } from "./pages/PlayerGame";
 import { t } from "./i18n";
+import { importWithReload } from "./lazyRetry";
 
-// Host screens (Firestore, Google sign-in) are loaded only when visited.
-const HostPage = lazy(() => import("./pages/HostPage").then((m) => ({ default: m.HostPage })));
-const HostGame = lazy(() => import("./pages/HostGame").then((m) => ({ default: m.HostGame })));
-const QuizEditor = lazy(() => import("./pages/QuizEditor").then((m) => ({ default: m.QuizEditor })));
+// Host screens (Firestore, host sign-in) are loaded only when visited. importWithReload: a page
+// left open across a deploy reloads once instead of crashing on a missing chunk.
+const HostPage = lazy(() => importWithReload(() => import("./pages/HostPage")).then((m) => ({ default: m.HostPage })));
+const HostGame = lazy(() => importWithReload(() => import("./pages/HostGame")).then((m) => ({ default: m.HostGame })));
+const QuizEditor = lazy(() =>
+  importWithReload(() => import("./pages/QuizEditor")).then((m) => ({ default: m.QuizEditor })),
+);
 
 /** Renders `children` only for a well-formed :pin; anything else goes home with a message. */
 function ValidPin({ children }: { children: ReactNode }) {
