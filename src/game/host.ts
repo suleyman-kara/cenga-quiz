@@ -1,11 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from "firebase/auth";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut as fbSignOut,
+  type ActionCodeSettings,
+  type User,
+} from "firebase/auth";
 import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
 import type { Quiz, QuizDoc } from "../../shared/types";
-import { auth } from "../firebase";
+import { auth, checkHostEmail } from "../firebase";
 import { firestore } from "../firestore";
 
-export type HostStatus = "loading" | "signedOut" | "unauthorized" | "authorized";
+/** "unverified": signed in with e-mail + password, but the address is not verified yet. */
+export type HostStatus = "loading" | "signedOut" | "unverified" | "unauthorized" | "authorized";
 
 export interface HostUser {
   uid: string;
@@ -16,47 +26,117 @@ export interface HostUser {
 export interface HostAuth {
   status: HostStatus;
   user: HostUser | null;
-  signIn: () => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  /** Rejects with code "host/email-not-allowed" (no account created) for addresses not on the list. */
+  signUp: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
+  /** Reloads the user and forces a fresh ID token; resolves true once the e-mail is verified. */
+  refreshVerification: () => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
-/** Google sign-in + allowedHosts/{email} check. Anonymous (player) users count as signed out. */
+export const EMAIL_NOT_ALLOWED = "host/email-not-allowed";
+
+/** Links in verification / reset e-mails lead back to the host panel. */
+function actionSettings(): ActionCodeSettings | undefined {
+  if (typeof window === "undefined" || !window.location?.origin) return undefined;
+  return { url: `${window.location.origin}/host` };
+}
+
+const CONTINUE_URL_ERRORS = new Set(["auth/unauthorized-continue-uri", "auth/invalid-continue-uri", "auth/missing-continue-uri"]);
+
+/** Sends with a continue URL; retries without one if this domain is not authorized for it. */
+async function withContinueUrl(send: (s?: ActionCodeSettings) => Promise<void>): Promise<void> {
+  const settings = actionSettings();
+  try {
+    await send(settings);
+  } catch (err) {
+    const code = (err as { code?: unknown } | null)?.code;
+    if (!settings || typeof code !== "string" || !CONTINUE_URL_ERRORS.has(code)) throw err;
+    await send();
+  }
+}
+
+type HostState = { status: HostStatus; user: HostUser | null };
+
+/**
+ * E-mail + password host sign-in, with mandatory e-mail verification and the allowedHosts/{email}
+ * check. Anonymous (player) users count as signed out.
+ */
 export function useHostAuth(): HostAuth {
-  const [state, setState] = useState<{ status: HostStatus; user: HostUser | null }>({
-    status: "loading",
-    user: null,
-  });
+  const [state, setState] = useState<HostState>({ status: "loading", user: null });
+  const alive = useRef(true);
+  /** Bumped per evaluation so a slow allow-list read cannot overwrite a newer answer. */
+  const seq = useRef(0);
+
+  const evaluate = useCallback(async (u: User | null) => {
+    const run = ++seq.current;
+    const set = (s: HostState) => {
+      if (alive.current && run === seq.current) setState(s);
+    };
+    if (!u || u.isAnonymous || !u.email) return set({ status: "signedOut", user: null });
+    const user = { uid: u.uid, email: u.email, displayName: u.displayName };
+    if (!u.emailVerified) return set({ status: "unverified", user });
+    set({ status: "loading", user });
+    let allowed = false;
+    try {
+      // rules key allowedHosts by the lowercased email
+      allowed = (await getDoc(doc(firestore, "allowedHosts", u.email.toLowerCase()))).exists();
+    } catch {
+      allowed = false;
+    }
+    set({ status: allowed ? "authorized" : "unauthorized", user });
+  }, []);
 
   useEffect(() => {
-    let alive = true;
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u || u.isAnonymous || !u.email) {
-        if (alive) setState({ status: "signedOut", user: null });
-        return;
-      }
-      const user = { uid: u.uid, email: u.email, displayName: u.displayName };
-      if (alive) setState({ status: "loading", user });
-      let allowed = false;
-      try {
-        // rules key allowedHosts by the lowercased email
-        allowed = (await getDoc(doc(firestore, "allowedHosts", u.email.toLowerCase()))).exists();
-      } catch {
-        allowed = false;
-      }
-      if (alive) setState({ status: allowed ? "authorized" : "unauthorized", user });
-    });
+    alive.current = true;
+    const unsub = onAuthStateChanged(auth, (u) => void evaluate(u));
     return () => {
-      alive = false;
+      alive.current = false;
       unsub();
     };
+  }, [evaluate]);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email.trim(), password);
   }, []);
 
-  const signIn = useCallback(async () => {
-    await signInWithPopup(auth, new GoogleAuthProvider());
+  const signUp = useCallback(async (email: string, password: string) => {
+    const address = email.trim();
+    if (!(await checkHostEmail(address))) {
+      throw Object.assign(new Error("Bu e-posta sunucu listesinde değil."), { code: EMAIL_NOT_ALLOWED });
+    }
+    const cred = await createUserWithEmailAndPassword(auth, address, password);
+    // The account exists now; if this send fails the verify screen offers "resend".
+    await withContinueUrl((s) => sendEmailVerification(cred.user, s)).catch(() => {});
   }, []);
+
+  const resetPassword = useCallback(async (email: string) => {
+    // Also works for an existing Google-provider account: it adds a password to that account.
+    await withContinueUrl((s) => (s ? sendPasswordResetEmail(auth, email.trim(), s) : sendPasswordResetEmail(auth, email.trim())));
+  }, []);
+
+  const resendVerification = useCallback(async () => {
+    const u = auth.currentUser;
+    if (!u) return;
+    await withContinueUrl((s) => sendEmailVerification(u, s));
+  }, []);
+
+  const refreshVerification = useCallback(async () => {
+    const u = auth.currentUser;
+    if (!u) return false;
+    await u.reload();
+    if (!u.emailVerified) return false;
+    // New ID token carries email_verified=true for the Firestore rules and the host callable.
+    await u.getIdToken(true);
+    await evaluate(u);
+    return true;
+  }, [evaluate]);
+
   const signOut = useCallback(() => fbSignOut(auth), []);
 
-  return { ...state, signIn, signOut };
+  return { ...state, signIn, signUp, resetPassword, resendVerification, refreshVerification, signOut };
 }
 
 export interface QuizListItem {

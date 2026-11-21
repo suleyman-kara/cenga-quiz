@@ -1072,6 +1072,37 @@
   height: auto;
 }
 
+/* host e-mail sign-in: "Giriş yap" / "Kayıt ol" toggle above the form */
+.host-auth {
+  width: min(420px, 100%);
+  text-align: start;
+}
+
+.host-auth__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-md);
+  background: var(--primary-wash);
+}
+
+.host-auth__tab {
+  min-height: 44px;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 4px);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.host-auth__tab--active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .verdict__burst,
   .orbit__ring {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createHostCheck } from "./hostAuth";
+import { createHostCheck, requireHostIdentity } from "./hostAuth";
 
 describe("createHostCheck (allowedHosts cache)", () => {
   it("caches positive and negative answers per e-mail for the TTL", async () => {
@@ -30,5 +30,31 @@ describe("createHostCheck (allowedHosts cache)", () => {
     const check = createHostCheck(async () => false, 60_000, () => 0, 3);
     for (const e of ["1", "2", "3", "4", "5"]) await check.isAllowed(e);
     expect(check.size()).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("requireHostIdentity (host callable)", () => {
+  const codeOf = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch (e) {
+      return (e as { code?: string }).code;
+    }
+    return "none";
+  };
+  it("requires a signed-in caller", () => {
+    expect(codeOf(() => requireHostIdentity(undefined))).toBe("unauthenticated");
+  });
+  it("rejects an unverified e-mail (email_verified must be true)", () => {
+    expect(codeOf(() => requireHostIdentity({ uid: "u", token: { email: "h@x.com", email_verified: false } }))).toBe(
+      "permission-denied",
+    );
+    expect(codeOf(() => requireHostIdentity({ uid: "u", token: { email: "h@x.com" } }))).toBe("permission-denied");
+  });
+  it("accepts a verified e-mail and normalizes it", () => {
+    expect(requireHostIdentity({ uid: "u", token: { email: " H@X.com", email_verified: true } })).toEqual({
+      uid: "u",
+      email: "h@x.com",
+    });
   });
 });

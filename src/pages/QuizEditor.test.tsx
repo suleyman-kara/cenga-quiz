@@ -33,7 +33,7 @@ const q1 = () => screen.getByRole("group", { name: t("editor.question", { n: 1 }
 
 describe("QuizEditor", () => {
   beforeEach(() => {
-    vi.mocked(useHostAuth).mockReturnValue({ status: "authorized", user, signIn: vi.fn(), signOut: vi.fn() });
+    vi.mocked(useHostAuth).mockReturnValue({ status: "authorized", user, signIn: vi.fn(), signUp: vi.fn(), resetPassword: vi.fn(), resendVerification: vi.fn(), refreshVerification: vi.fn(), signOut: vi.fn() });
     vi.mocked(loadQuiz).mockReset();
     vi.mocked(saveQuiz).mockReset().mockResolvedValue("newId");
     vi.mocked(updateQuiz).mockReset().mockResolvedValue(undefined);

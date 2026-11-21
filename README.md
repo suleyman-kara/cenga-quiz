@@ -71,7 +71,7 @@ test eder. Adımlar [`AGENTS.md`](AGENTS.md) içinde.
 
 ## Firebase kurulumu
 
-Sistem Firebase üzerinde çalışır: Hosting, Authentication (Google + Anonymous),
+Sistem Firebase üzerinde çalışır: Hosting, Authentication (E-posta/Şifre + Anonymous),
 Firestore, Realtime Database ve Cloud Functions.
 
 - **Blaze planı gereklidir.** Cloud Functions, zamanlanmış temizlik ve 100'den fazla
@@ -133,7 +133,7 @@ Tam tanım: [`quizzes/quiz.schema.json`](quizzes/quiz.schema.json). Örnek:
 ```mermaid
 flowchart LR
   subgraph Tarayici["Tarayıcı (Vite + React)"]
-    H["Sunucu paneli<br/>/host · Google girişi"]
+    H["Sunucu paneli<br/>/host · E-posta + şifre"]
     P["Oyuncu<br/>/play · Anonim giriş"]
   end
 

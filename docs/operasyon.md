@@ -17,9 +17,11 @@ içindir. Kaynaklar her maddenin altında.
 - [ ] **API anahtarını kısıtla.** Google Cloud Console → APIs & Services →
   Credentials → tarayıcı anahtarı → yalnızca Firebase API'leri ve kendi alan
   adlarınız. Yönlendiren (referrer) listesine **mutlaka**
-  `<proje-kimliği>.web.app/*`, `<proje-kimliği>.firebaseapp.com/*` (Google
-  giriş penceresi buradan açılır) ve varsa özel alan adınızı ekleyin; aksi halde
-  sunucu girişi bozulur. (Web API anahtarı gizli değildir; kısıtlama kötüye
+  `<proje-kimliği>.web.app/*`, `<proje-kimliği>.firebaseapp.com/*` (doğrulama
+  ve şifre sıfırlama bağlantılarının açıldığı sayfa buradadır) ve varsa özel alan
+  adınızı ekleyin; aksi halde sunucu girişi bozulur. Anahtarın izinli API'leri
+  arasında **Identity Toolkit API** ve **Token Service API** bulunmalı
+  (e-posta + şifre girişi bunları kullanır). (Web API anahtarı gizli değildir; kısıtlama kötüye
   kullanımı azaltır.)
   _Kaynak: firebase.google.com/docs/projects/api-keys_
 - [ ] **Realtime Database konumu `europe-west1`** olmalı (URL

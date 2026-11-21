@@ -251,3 +251,16 @@ export interface CallableContract {
 export type CallableName = keyof CallableContract;
 
 export const FUNCTIONS_REGION = "europe-west1";
+
+// ---------------------------------------------------------------------------
+// Host e-mail sign-up pre-check (callable `checkHostEmail`, works signed out).
+// Answers only whether ONE address is on the allow-list; the list never leaves the server.
+// ---------------------------------------------------------------------------
+
+export const CHECK_HOST_EMAIL_CALLABLE = "checkHostEmail";
+export interface CheckHostEmailRequest {
+  email: string;
+}
+export interface CheckHostEmailResponse {
+  allowed: boolean;
+}

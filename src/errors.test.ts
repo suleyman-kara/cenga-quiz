@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { errorCode, friendlyError, isPermissionDenied, isSilentAuthError } from "./errors";
+import { errorCode, friendlyError, hostAuthError, isPermissionDenied } from "./errors";
 import { translate } from "./i18n";
 import { club } from "./club.config";
 
@@ -51,14 +51,21 @@ describe("friendlyError", () => {
   });
 });
 
-describe("sign-in errors", () => {
-  it("explains a blocked popup and an unauthorized domain", () => {
-    expect(friendlyError(withCode("auth/popup-blocked"))).toBe(t("errors.popupBlocked"));
+describe("host sign-in errors", () => {
+  it("explains an unauthorized domain", () => {
     expect(friendlyError(withCode("auth/unauthorized-domain"))).toBe(t("errors.unauthorizedDomain"));
   });
-  it("closing / superseding the popup is silent", () => {
-    expect(isSilentAuthError(withCode("auth/popup-closed-by-user"))).toBe(true);
-    expect(isSilentAuthError(withCode("auth/cancelled-popup-request"))).toBe(true);
-    expect(isSilentAuthError(withCode("auth/popup-blocked"))).toBe(false);
+  it("maps email/password auth codes to friendly Turkish messages", () => {
+    for (const c of ["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-login-credentials"]) {
+      expect(hostAuthError(withCode(c))).toBe(t("host.wrongCredentials"));
+    }
+    expect(hostAuthError(withCode("auth/email-already-in-use"))).toBe(t("host.emailInUse"));
+    expect(hostAuthError(withCode("auth/weak-password"))).toBe(t("host.weakPassword"));
+    expect(hostAuthError(withCode("auth/invalid-email"))).toBe(t("host.invalidEmail"));
+    expect(hostAuthError(withCode("auth/too-many-requests"))).toBe(t("host.tooManyAttempts"));
+    expect(hostAuthError(withCode("auth/network-request-failed"))).toBe(t("errors.network"));
+    expect(hostAuthError(withCode("host/email-not-allowed"))).toBe(t("host.notAllowedEmail"));
+    expect(hostAuthError(withCode("auth/user-disabled"))).toBe(t("host.userDisabled"));
+    expect(hostAuthError(new Error("boom"))).toBe(t("errors.generic"));
   });
 });

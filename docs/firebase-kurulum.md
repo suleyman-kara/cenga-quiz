@@ -21,7 +21,7 @@ yayına almak içindir. Toplam süre: ~30 dakika (ilk Functions deploy'u 5-10 dk
 
 | Ürün | Ayar |
 |---|---|
-| **Authentication** → Sign-in method | **Google**'ı etkinleştir (destek e-postası seç) ve **Anonymous**'u etkinleştir. |
+| **Authentication** → Sign-in method | **Email/Password**'ü etkinleştir ("Email link" kapalı kalabilir) ve **Anonymous**'u etkinleştir. Sunucular e-posta + şifreyle girer. |
 | **Firestore Database** | Oluştur → *Production mode* → konum: `eur3 (Europe)` veya `europe-west1`. Kurallar deploy ile gelir. |
 | **Realtime Database** | Oluştur → konum: **Belçika (`europe-west1`)** → *Locked mode*. Kurallar deploy ile gelir. |
 | **Hosting** | Ayrıca bir şey yapmaya gerek yok; ilk deploy açar. |
@@ -75,7 +75,15 @@ npm run deploy              # web build + kurallar + Functions + Hosting
 
 ## 5. Kendini sunucu (host) olarak ekle
 
-Sunucu paneline sadece izin listesindeki Google hesapları girebilir.
+Sunucu paneline sadece izin listesindeki, **e-postası doğrulanmış** hesaplar
+girebilir. Önce e-postanı listeye ekle, sonra panelde **Kayıt ol** ile hesap aç:
+listede olmayan adresler için hesap açılmaz. Kayıttan sonra gelen doğrulama
+bağlantısını açıp **Doğruladım, devam et**'e bas. Önceden Google ile giriş yapmış
+bir hesabın varsa **Kayıt ol** yerine **Şifremi unuttum** ile şifre belirle.
+
+> Doğrulama ve şifre sıfırlama e-postaları Firebase'in varsayılan göndericisinden
+> (`noreply@<proje-kimliği>.firebaseapp.com`) gelir ve **spam klasörüne düşebilir**.
+> Metinleri Authentication → Templates'ten düzenleyebilirsin.
 
 **Konsoldan (en kolay):** Firestore Database → **Koleksiyon başlat** →
 koleksiyon kimliği `allowedHosts` → belge kimliği: e-posta adresin, **küçük
@@ -87,7 +95,7 @@ yaptıktan sonra `npm run add-host -- ad.soyad@gmail.com`.
 
 ## 6. Uçtan uca dene
 
-1. `https://<proje-kimliği>.web.app/host` → Google ile giriş.
+1. `https://<proje-kimliği>.web.app/host` → **Kayıt ol** (e-posta + en az 8 karakterlik şifre) → doğrulama e-postasındaki bağlantı → **Doğruladım, devam et**.
 2. **JSON'dan quiz içe aktar** → `quizzes/ornek.json` dosyasını seç → kaydet.
 3. **Oyunu başlat** → büyük ekranda PIN görünür.
 4. Telefondan `https://<proje-kimliği>.web.app` → PIN + takma ad → katıl.
@@ -111,14 +119,19 @@ yaptıktan sonra `npm run add-host -- ad.soyad@gmail.com`.
   dosyasına `MIN_INSTANCES=1` ekle → `npm run deploy:functions`; etkinlikten
   sonra `0` yapıp tekrar deploy et.
 - **Özel alan adı:** Hosting → Özel alan adı ekle. Sonra Authentication →
-  Settings → **Authorized domains** listesine o alan adını ekle.
+  Settings → **Authorized domains** listesine o alan adını ekle. Doğrulama ve
+  şifre sıfırlama e-postalarındaki bağlantılar panele (`/host`) geri döner; alan
+  adı bu listede yoksa bağlantı yine çalışır ama panele dönüş adresi eklenmez.
 
 ## Sorun giderme
 
 | Belirti | Çözüm |
 |---|---|
 | Sunucu panelinde "yetkin yok" | `allowedHosts` belge kimliği e-postanla birebir (küçük harf) aynı mı? |
-| Google girişi açılır pencerede `auth/unauthorized-domain` | Authentication → Settings → Authorized domains'e alan adını ekle. |
+| Girişte `auth/unauthorized-domain` | Authentication → Settings → Authorized domains'e alan adını ekle. |
+| Girişte "E-posta veya şifre hatalı." ama hesap var | Hesap önceden Google ile açılmış olabilir: **Şifremi unuttum** ile şifre belirle. Email/Password sağlayıcısı açık mı? |
+| Doğrulama / sıfırlama e-postası gelmiyor | Spam klasörüne bak; panelden **Doğrulama e-postasını tekrar gönder**. |
+| Kayıtta "Bu e-posta sunucu listesinde değil." | `allowedHosts` belgesini küçük harfli e-postayla ekle, en geç 60 sn bekle. |
 | Oyuncular katılamıyor, `auth/too-many-requests` | Aynı ağdan çok kişi: Authentication → Settings → Sign-up quota'yı geçici olarak artır (bkz. operasyon.md). |
 | Functions deploy'u "billing account" hatası | Proje Blaze planında değil. |
 | Sayfa boş / "yapılandırma eksik" ekranı | `npm run configure` çalıştırılmadan build alınmış. Çalıştırıp `npm run deploy:hosting`. |

@@ -24,6 +24,7 @@ vi.mock("../../shared/quizValidate", async (importOriginal) => ({
 
 const t = (k: Parameters<typeof translate>[1], v?: Record<string, string | number>) => translate(club.locale, k, v);
 const signIn = vi.fn();
+const authApi = () => ({ signIn, signUp: vi.fn(), resetPassword: vi.fn(), resendVerification: vi.fn(), refreshVerification: vi.fn(), signOut: vi.fn() });
 const user = { uid: "h1", email: "host@example.org", displayName: "Host" };
 
 function renderPage() {
@@ -48,7 +49,7 @@ const validQuiz = { title: "Genel kültür", questions: [{ text: "S1", options: 
 describe("HostPage", () => {
   beforeEach(() => {
     signIn.mockReset().mockResolvedValue(undefined);
-    vi.mocked(useHostAuth).mockReturnValue({ status: "authorized", user, signIn, signOut: vi.fn() });
+    vi.mocked(useHostAuth).mockReturnValue({ status: "authorized", user, ...authApi() });
     vi.mocked(useMyQuizzes).mockReturnValue({
       quizzes: [{ id: "quiz1", title: "Tarih", questionCount: 7, updatedAt: 0 }],
       loading: false,
@@ -60,16 +61,25 @@ describe("HostPage", () => {
     vi.mocked(hostCall).mockReset();
   });
 
-  it("signed out: offers Google sign-in", async () => {
-    vi.mocked(useHostAuth).mockReturnValue({ status: "signedOut", user: null, signIn, signOut: vi.fn() });
+  it("signed out: offers email + password sign-in", async () => {
+    vi.mocked(useHostAuth).mockReturnValue({ status: "signedOut", user: null, ...authApi() });
     renderPage();
     expect(screen.getByAltText(club.logo.alt)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: t("host.signIn") }));
-    expect(signIn).toHaveBeenCalledTimes(1);
+    await userEvent.type(screen.getByLabelText(t("host.email")), "host@example.org");
+    await userEvent.type(screen.getByLabelText(t("host.password")), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: t("host.submitSignIn") }));
+    expect(signIn).toHaveBeenCalledWith("host@example.org", "secret123");
+  });
+
+  it("unverified: shows the verify screen, not the dashboard", () => {
+    vi.mocked(useHostAuth).mockReturnValue({ status: "unverified", user, ...authApi() });
+    renderPage();
+    expect(screen.getByRole("heading", { name: t("host.verifyTitle") })).toBeInTheDocument();
+    expect(screen.queryByText(t("host.myQuizzes"))).not.toBeInTheDocument();
   });
 
   it("not on the allow-list: shows not-authorized message", () => {
-    vi.mocked(useHostAuth).mockReturnValue({ status: "unauthorized", user, signIn, signOut: vi.fn() });
+    vi.mocked(useHostAuth).mockReturnValue({ status: "unauthorized", user, ...authApi() });
     renderPage();
     expect(screen.getByText(t("host.notAuthorized", { email: user.email }))).toBeInTheDocument();
     expect(screen.queryByText(t("host.myQuizzes"))).not.toBeInTheDocument();

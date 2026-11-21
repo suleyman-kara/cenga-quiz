@@ -87,7 +87,7 @@ Ayrıntılar [`docs/firebase-kurulum.md`](docs/firebase-kurulum.md) içinde. Öz
 3. **Bütçe uyarısı:** Google Cloud → Faturalandırma → Bütçeler ve uyarılar.
    Fatura hesabının para birimine dikkat et (ör. TL hesabında dolar tutarı
    girilmez); tutarı kullanıcıya sor.
-4. Authentication: **Google** ve **Anonymous** sağlayıcılarını aç.
+4. Authentication: **Email/Password** ve **Anonymous** sağlayıcılarını aç.
 5. Firestore: Production mode, konum `europe-west1` ya da `eur3`.
 6. Realtime Database: **Belçika (`europe-west1`)**, Locked mode. Başka bölgede
    oyuncu katılım tetikleyicileri çalışmaz.
@@ -117,7 +117,10 @@ npm run deploy
 
 ### 7. Örnek quizle uçtan uca test et
 
-1. `https://<proje>.web.app/host` → Google ile giriş.
+1. `https://<proje>.web.app/host` → **Kayıt ol** (e-posta + şifre; e-posta önce
+   `allowedHosts`'ta olmalı) → doğrulama e-postasındaki bağlantı → **Doğruladım,
+   devam et**. Doğrulama/sıfırlama e-postaları Firebase'in varsayılan
+   göndericisinden gelir, spam klasörüne düşebilir. Şifreyi kullanıcı belirler.
 2. `quizzes/ornek.json` dosyasını "JSON'dan quiz içe aktar" ile yükle → oyunu başlat.
 3. Oyuncu tarafını ayrı bir oturumda aç (gizli pencere ya da telefon): PIN + takma ad.
 4. Lobi → "hazır ol" → cevap → sıralama → oyunu bitir → podyum adımlarının hepsi

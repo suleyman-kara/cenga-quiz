@@ -3,8 +3,11 @@ import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectDatabaseEmulator, forceLongPolling, getDatabase } from "firebase/database";
 import { connectFunctionsEmulator, getFunctions, httpsCallable } from "firebase/functions";
 import {
+  CHECK_HOST_EMAIL_CALLABLE,
   FUNCTIONS_REGION,
   HOST_CALLABLE,
+  type CheckHostEmailRequest,
+  type CheckHostEmailResponse,
   type HostAction,
   type HostActionMap,
   type HostRequest,
@@ -68,4 +71,12 @@ export async function hostCall<A extends HostAction>(
 ): Promise<HostActionMap[A]["res"]> {
   const result = await hostFn({ action, ...args } as HostRequest);
   return result.data as HostActionMap[A]["res"];
+}
+
+const checkHostEmailFn = httpsCallable<CheckHostEmailRequest, CheckHostEmailResponse>(functions, CHECK_HOST_EMAIL_CALLABLE);
+
+/** Sign-up pre-check: is this one address on the host allow-list? (callable works signed out) */
+export async function checkHostEmail(email: string): Promise<boolean> {
+  const result = await checkHostEmailFn({ email });
+  return result.data.allowed === true;
 }
