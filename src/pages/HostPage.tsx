@@ -1,7 +1,9 @@
 import { useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { validateQuiz } from "../../shared/quizValidate";
-import { deleteQuiz, saveQuiz, useMyQuizzes, type HostUser } from "../game/host";
+import type { Quiz } from "../../shared/types";
+import { deleteQuiz, loadQuiz, saveQuiz, useMyQuizzes, type HostUser } from "../game/host";
+import { copyTitle, downloadQuiz } from "../host/quizFile";
 import { HostGate } from "../host/HostGate";
 import { Layout } from "../components/Layout";
 import { ChoiceShape } from "../components/ChoiceShape";
@@ -21,6 +23,35 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
   const [starting, setStarting] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<{ id: string; title: string } | null>(null);
+  const [cardBusy, setCardBusy] = useState<string | null>(null);
+  const [cardNotice, setCardNotice] = useState<string | null>(null);
+
+  /** Loads the full quiz for a card action; reports a missing quiz or a read error. */
+  async function withQuiz(quizId: string, action: (quiz: Quiz) => Promise<void> | void) {
+    if (cardBusy) return;
+    setCardBusy(quizId);
+    setStartError(null);
+    setCardNotice(null);
+    try {
+      const quiz = await loadQuiz(quizId);
+      if (!quiz) setStartError(t("editor.notFound"));
+      else await action(quiz);
+    } catch (err) {
+      setStartError(t("common.error", { message: (err as Error).message }));
+    } finally {
+      setCardBusy(null);
+    }
+  }
+
+  const download = (quizId: string) => withQuiz(quizId, (quiz) => downloadQuiz(quiz));
+
+  const duplicate = (quizId: string) =>
+    withQuiz(quizId, async (quiz) => {
+      const suffix = t("host.copyTitle", { title: "" });
+      const title = copyTitle(quiz.title, suffix);
+      await saveQuiz(user.uid, { ...quiz, title });
+      setCardNotice(t("host.copied", { title }));
+    });
 
   async function confirmDelete() {
     const target = toDelete;
@@ -63,6 +94,11 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
               {t("host.newQuiz")}
             </Link>
           </div>
+          {cardNotice && (
+            <p className="status status--ok" role="status">
+              {cardNotice}
+            </p>
+          )}
           {startError && (
             <p className="field__error" role="alert">
               {startError}
@@ -101,6 +137,23 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
                     <Link className="btn btn--ghost btn--small" to={`/host/quiz/${q.id}`}>
                       {t("host.editQuiz")}
                     </Link>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--small"
+                      aria-busy={cardBusy === q.id || undefined}
+                      disabled={cardBusy !== null}
+                      onClick={() => void duplicate(q.id)}
+                    >
+                      {t("host.copyQuiz")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--small"
+                      disabled={cardBusy !== null}
+                      onClick={() => void download(q.id)}
+                    >
+                      {t("host.downloadQuiz")}
+                    </button>
                     <button
                       type="button"
                       className="btn btn--ghost btn--small btn--danger"

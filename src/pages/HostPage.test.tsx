@@ -1,17 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { translate } from "../i18n";
 import { club } from "../club.config";
 import { HostPage } from "./HostPage";
-import { useHostAuth, useMyQuizzes, saveQuiz, deleteQuiz } from "../game/host";
+import { useHostAuth, useMyQuizzes, saveQuiz, deleteQuiz, loadQuiz } from "../game/host";
 import { validateQuiz } from "../../shared/quizValidate";
 import { hostCall } from "../firebase";
 
 vi.mock("../firebase", () => ({ hostCall: vi.fn() }));
-vi.mock("../game/host", () => ({ useHostAuth: vi.fn(), useMyQuizzes: vi.fn(), saveQuiz: vi.fn(), deleteQuiz: vi.fn() }));
-vi.mock("../../shared/quizValidate", () => ({ validateQuiz: vi.fn() }));
+vi.mock("../game/host", () => ({
+  useHostAuth: vi.fn(),
+  useMyQuizzes: vi.fn(),
+  saveQuiz: vi.fn(),
+  deleteQuiz: vi.fn(),
+  loadQuiz: vi.fn(),
+}));
+vi.mock("../../shared/quizValidate", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../shared/quizValidate")>()),
+  validateQuiz: vi.fn(),
+}));
 
 const t = (k: Parameters<typeof translate>[1], v?: Record<string, string | number>) => translate(club.locale, k, v);
 const signIn = vi.fn();
@@ -139,5 +148,53 @@ describe("HostPage", () => {
     expect(deleteQuiz).not.toHaveBeenCalled();
     await userEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: t("host.deleteOk") }));
     expect(deleteQuiz).toHaveBeenCalledWith("quiz1");
+  });
+
+  describe("quiz card extras", () => {
+    const stored = {
+      title: "Tarih",
+      questions: [{ text: "İlk soru", options: ["a", "b"], correct: 1, seconds: 20 }],
+    };
+    let click: ReturnType<typeof vi.spyOn>;
+    let downloads: { href: string; download: string }[];
+    let blob: Blob | undefined;
+
+    beforeEach(() => {
+      vi.mocked(loadQuiz).mockReset().mockResolvedValue(stored);
+      downloads = [];
+      blob = undefined;
+      URL.createObjectURL = vi.fn((b: Blob) => ((blob = b), "blob:quiz"));
+      URL.revokeObjectURL = vi.fn();
+      click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+        downloads.push({ href: this.href, download: this.download });
+      });
+    });
+    afterEach(() => click.mockRestore());
+
+    it("JSON download loads the quiz and saves it as a .json file", async () => {
+      renderPage();
+      await userEvent.click(screen.getByRole("button", { name: t("host.downloadQuiz") }));
+      expect(loadQuiz).toHaveBeenCalledWith("quiz1");
+      await waitFor(() => expect(downloads).toEqual([{ href: "blob:quiz", download: "tarih.json" }]));
+      expect(JSON.parse(await blob!.text())).toEqual(stored);
+    });
+
+    it("Copy saves a duplicate titled '<title> (kopya)'", async () => {
+      renderPage();
+      await userEvent.click(screen.getByRole("button", { name: t("host.copyQuiz") }));
+      const title = t("host.copyTitle", { title: "Tarih" });
+      await waitFor(() => expect(saveQuiz).toHaveBeenCalledWith("h1", { ...stored, title }));
+      expect(await screen.findByText(t("host.copied", { title }))).toBeInTheDocument();
+    });
+
+    it("a missing quiz shows an error instead of downloading or copying", async () => {
+      vi.mocked(loadQuiz).mockResolvedValue(null);
+      renderPage();
+      await userEvent.click(screen.getByRole("button", { name: t("host.copyQuiz") }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(t("editor.notFound"));
+      await userEvent.click(screen.getByRole("button", { name: t("host.downloadQuiz") }));
+      expect(saveQuiz).not.toHaveBeenCalled();
+      expect(downloads).toEqual([]);
+    });
   });
 });

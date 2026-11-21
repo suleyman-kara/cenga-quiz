@@ -3,7 +3,12 @@ import { validateQuiz } from "../../shared/quizValidate";
 import {
   addOption,
   addQuestion,
+  appendQuestions,
   describeErrors,
+  duplicateQuestion,
+  emptyQuestion,
+  isPreviewableImage,
+  reorderQuestion,
   draftFromQuiz,
   draftToInput,
   emptyDraft,
@@ -13,6 +18,7 @@ import {
   setCorrect,
   setOption,
   updateQuestion,
+  type QuestionDraft,
   type QuizDraft,
 } from "./quizDraft";
 
@@ -116,5 +122,68 @@ describe("describeErrors", () => {
     const d = describeErrors(["questions[2].options: şıklar birbirinden farklı olmalı", "questions: 1 ile 100 arasında soru olmalı"]);
     expect(d.byQuestion[2]).toEqual(["Şıklar: şıklar birbirinden farklı olmalı"]);
     expect(d.general).toEqual(["Sorular: 1 ile 100 arasında soru olmalı"]);
+  });
+});
+
+describe("editor extras", () => {
+  const q = (text: string): QuestionDraft => ({ ...emptyQuestion(), text, options: ["a", "b"] });
+
+  it("every question gets a unique id (not part of the saved quiz)", () => {
+    const d = draftFromQuiz(quiz);
+    const ids = [...d.questions, ...emptyDraft().questions].map((x) => x.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const input = draftToInput(d) as { questions: Record<string, unknown>[] };
+    expect(input.questions[0]).not.toHaveProperty("id");
+  });
+
+  it("duplicates a question right after itself with a new id", () => {
+    const d = draftFromQuiz(quiz);
+    const out = duplicateQuestion(d, 0);
+    expect(out.questions.map((x) => x.text)).toEqual(["Başkent?", "Başkent?", "Su?"]);
+    expect(out.questions[1].options).toEqual(out.questions[0].options);
+    expect(out.questions[1].options).not.toBe(out.questions[0].options);
+    expect(out.questions[1].id).not.toBe(out.questions[0].id);
+    expect(d.questions).toHaveLength(2);
+  });
+
+  it("does not duplicate past the question limit", () => {
+    const d: QuizDraft = { title: "", description: "", questions: Array.from({ length: 100 }, () => q("x")) };
+    expect(duplicateQuestion(d, 0)).toBe(d);
+  });
+
+  it("appends questions, replacing a single completely empty question", () => {
+    const fresh = appendQuestions(emptyDraft(), [q("A"), q("B")]);
+    expect(fresh.questions.map((x) => x.text)).toEqual(["A", "B"]);
+    expect(new Set(fresh.questions.map((x) => x.id)).size).toBe(2);
+
+    const started = updateQuestion(emptyDraft(), 0, { seconds: "20" });
+    expect(appendQuestions(started, [q("A")]).questions).toHaveLength(2);
+
+    const existing = appendQuestions(draftFromQuiz(quiz), [q("C")]);
+    expect(existing.questions.map((x) => x.text)).toEqual(["Başkent?", "Su?", "C"]);
+  });
+
+  it("appending stops at the question limit", () => {
+    const many = Array.from({ length: 120 }, (_, i) => q(`S${i}`));
+    const out = appendQuestions(draftFromQuiz(quiz), many);
+    expect(out.questions).toHaveLength(100);
+    expect(out.questions[99].text).toBe("S97");
+  });
+
+  it("reorders by moving one question to another position (drag and drop)", () => {
+    const d = appendQuestions(emptyDraft(), [q("A"), q("B"), q("C")]);
+    expect(reorderQuestion(d, 0, 2).questions.map((x) => x.text)).toEqual(["B", "C", "A"]);
+    expect(reorderQuestion(d, 2, 0).questions.map((x) => x.text)).toEqual(["C", "A", "B"]);
+    expect(reorderQuestion(d, 1, 1)).toBe(d);
+    expect(reorderQuestion(d, 0, 5)).toBe(d);
+  });
+
+  it("only valid https image addresses are previewed", () => {
+    expect(isPreviewableImage("https://a.b/c.png")).toBe(true);
+    expect(isPreviewableImage("  https://a.b/c.png ")).toBe(true);
+    expect(isPreviewableImage("http://a.b/c.png")).toBe(false);
+    expect(isPreviewableImage("https://")).toBe(false);
+    expect(isPreviewableImage("https://a b")).toBe(false);
+    expect(isPreviewableImage("")).toBe(false);
   });
 });

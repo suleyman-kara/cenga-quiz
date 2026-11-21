@@ -13,6 +13,8 @@ export interface QuestionDraft {
   /** "" = use the club's default duration */
   seconds: string;
   imageUrl: string;
+  /** Editor-only stable identity (React keys, collapse state, drag and drop); never saved. */
+  id?: number;
 }
 
 export interface QuizDraft {
@@ -21,8 +23,23 @@ export interface QuizDraft {
   questions: QuestionDraft[];
 }
 
+let lastId = 0;
+/** A new editor-only question id, unique within this page load. */
+export const nextQuestionId = () => ++lastId;
+
 export function emptyQuestion(): QuestionDraft {
-  return { text: "", options: ["", ""], correct: 0, seconds: "", imageUrl: "" };
+  return { text: "", options: ["", ""], correct: 0, seconds: "", imageUrl: "", id: nextQuestionId() };
+}
+
+/** Nothing typed yet: no text, no option text, no time, no image and the default correct option. */
+export function isEmptyQuestion(q: QuestionDraft): boolean {
+  return (
+    !q.text.trim() &&
+    q.options.every((o) => !o.trim()) &&
+    q.correct === 0 &&
+    !q.seconds.trim() &&
+    !q.imageUrl.trim()
+  );
 }
 
 export function emptyDraft(): QuizDraft {
@@ -39,6 +56,7 @@ export function draftFromQuiz(quiz: Quiz): QuizDraft {
       correct: q.correct,
       seconds: q.seconds === undefined ? "" : String(q.seconds),
       imageUrl: q.imageUrl ?? "",
+      id: nextQuestionId(),
     })),
   };
 }
@@ -83,6 +101,50 @@ export function moveQuestion(d: QuizDraft, i: number, dir: -1 | 1): QuizDraft {
   const questions = [...d.questions];
   [questions[i], questions[j]] = [questions[j], questions[i]];
   return { ...d, questions };
+}
+
+/** Inserts a copy (with a new id) right after question i. */
+export function duplicateQuestion(d: QuizDraft, i: number): QuizDraft {
+  const src = d.questions[i];
+  if (!src || d.questions.length >= QUIZ_LIMITS.questionsMax) return d;
+  const copy: QuestionDraft = { ...src, options: [...src.options], id: nextQuestionId() };
+  const questions = [...d.questions];
+  questions.splice(i + 1, 0, copy);
+  return { ...d, questions };
+}
+
+/**
+ * Appends questions (e.g. parsed from pasted text), each with a new id. A draft that only holds
+ * one completely empty question (a fresh quiz) has it replaced. Stops at the question limit.
+ */
+export function appendQuestions(d: QuizDraft, added: readonly QuestionDraft[]): QuizDraft {
+  const base = d.questions.length === 1 && isEmptyQuestion(d.questions[0]) ? [] : d.questions;
+  const room = Math.max(0, QUIZ_LIMITS.questionsMax - base.length);
+  const fresh = added.slice(0, room).map((q) => ({ ...q, options: [...q.options], id: nextQuestionId() }));
+  if (fresh.length === 0) return d;
+  return { ...d, questions: [...base, ...fresh] };
+}
+
+/** Moves question `from` to position `to` (drag and drop). */
+export function reorderQuestion(d: QuizDraft, from: number, to: number): QuizDraft {
+  const n = d.questions.length;
+  if (from === to || from < 0 || to < 0 || from >= n || to >= n) return d;
+  const questions = [...d.questions];
+  const [moved] = questions.splice(from, 1);
+  questions.splice(to, 0, moved);
+  return { ...d, questions };
+}
+
+/** Same rule as validateQuiz's image check: a whitespace-free https:// URL with a host. */
+export function isPreviewableImage(url: string): boolean {
+  const s = url.trim();
+  if (!s || /\s/.test(s)) return false;
+  try {
+    const u = new URL(s);
+    return u.protocol === "https:" && u.hostname.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 export function setOption(d: QuizDraft, qi: number, oi: number, value: string): QuizDraft {
