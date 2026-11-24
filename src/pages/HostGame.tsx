@@ -51,6 +51,9 @@ type PinAction = Exclude<keyof HostActionMap, "createGame">;
 /** A transition lock older than this is stale (crashed call) and ignored, as in the rules. */
 const LOCK_STALE_MS = 30_000;
 
+/** "+N sn" button on the stage (the server accepts 5-120). */
+const EXTEND_STEP_SECONDS = 15;
+
 function BigScreen({ pin }: { pin: string }) {
   const meta = useMeta(pin);
   const state = useGameState(pin);
@@ -104,7 +107,10 @@ function BigScreen({ pin }: { pin: string }) {
   };
 
   const inQuestion = state?.phase === "question";
-  const started = !!state && now >= state.startedAt;
+  // paused by the host: every clock on this screen stands at pausedAt
+  const paused = inQuestion && !!state?.pausedAt;
+  const clockNow = paused ? state!.pausedAt! : now;
+  const started = !!state && clockNow >= state.startedAt;
   const playerUids = players.map((p) => p.uid);
   const answered = answeredCount(playerUids, answerUids);
   const allAnswered = allPlayersAnswered(playerUids, answerUids);
@@ -112,18 +118,25 @@ function BigScreen({ pin }: { pin: string }) {
   const auto = useAutoReveal({
     qIndex,
     active: inQuestion,
-    due: inQuestion && started && !!state && revealDue({ endsAt: state.endsAt, now, allAnswered }),
+    due: inQuestion && !paused && started && !!state && revealDue({ endsAt: state.endsAt, now: clockNow, allAnswered }),
     // never in the same tick as a kick/lock/etc.: wait for it to finish, then re-evaluate
     paused: busy,
     reveal: doReveal,
     onError: showError,
   });
   const computing = !!state?.lock && state.lock.at > now - LOCK_STALE_MS;
-  const timerRunning = inQuestion && !!state && started && now < state.endsAt;
+  const timerRunning = inQuestion && !paused && !!state && started && now < state.endsAt;
   // Early reveal (time left, not everyone answered) asks first. The dialog is keyed by qIndex and
   // closes by itself once the auto-reveal fires or the question/phase changes, so a late confirm
   // can never send a second reveal (auto.reveal also ignores repeats for the same qIndex).
   const [revealAskFor, setRevealAskFor] = useState<number | null>(null);
+  const [skipAskFor, setSkipAskFor] = useState<number | null>(null);
+  const askingSkip = inQuestion && skipAskFor === qIndex;
+  const togglePause = () => void run(paused ? "resumeQuestion" : "pauseQuestion", { pin, qIndex });
+  const confirmSkip = () => {
+    setSkipAskFor(null);
+    if (askingSkip) void run("skipQuestion", { pin, qIndex });
+  };
   const askingReveal = revealAskFor === qIndex && timerRunning && !allAnswered && !auto.sent;
   // once the dialog closed by itself, forget the request (it must never pop up again later)
   useEffect(() => {
@@ -144,7 +157,7 @@ function BigScreen({ pin }: { pin: string }) {
           phase: state.phase,
           qIndex: state.qIndex,
           players: players.length,
-          secondsLeft: timerRunning ? remainingSeconds(state.endsAt, now) : null,
+          secondsLeft: timerRunning ? remainingSeconds(state.endsAt, clockNow) : null,
           double: inQuestion && question?.index === state.qIndex && !!question.double,
         }
       : null,
@@ -198,22 +211,56 @@ function BigScreen({ pin }: { pin: string }) {
             state={state}
             meta={meta}
             question={question?.index === state.qIndex ? question : null}
-            now={now}
+            now={clockNow}
             answered={answered}
             total={players.length}
+            paused={paused}
           />
         );
-        if (!auto.sent && started) next = pressReveal;
-        controls = (
-          <button
-            type="button"
-            className="btn btn--primary btn--stage"
-            disabled={auto.sent || !started}
-            onClick={pressReveal}
-          >
-            {t("hostGame.reveal")}
-          </button>
-        );
+        if (!auto.sent && started && !paused) next = pressReveal;
+        {
+          const isLast = !!meta && state.qIndex >= meta.questionCount - 1;
+          const ended = clockNow >= state.endsAt;
+          controls = (
+            <>
+              <button
+                type="button"
+                className="btn btn--ghost btn--stage"
+                aria-pressed={paused}
+                disabled={busy || auto.sent || (!paused && ended)}
+                onClick={togglePause}
+              >
+                {paused ? t("hostGame.resume") : t("hostGame.pause")}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost btn--stage"
+                disabled={busy || auto.sent || ended}
+                onClick={() => void run("extendTime", { pin, qIndex: state.qIndex, seconds: EXTEND_STEP_SECONDS })}
+              >
+                {t("hostGame.extend", { seconds: EXTEND_STEP_SECONDS })}
+              </button>
+              {!isLast && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--stage"
+                  disabled={busy || auto.sent}
+                  onClick={() => setSkipAskFor(state.qIndex)}
+                >
+                  {t("hostGame.skip")}
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn--primary btn--stage"
+                disabled={auto.sent || !started || paused}
+                onClick={pressReveal}
+              >
+                {t("hostGame.reveal")}
+              </button>
+            </>
+          );
+        }
         break;
       case "reveal":
         if (!busy) next = () => void run("showLeaderboard", { pin, qIndex: state.qIndex });
@@ -300,9 +347,14 @@ function BigScreen({ pin }: { pin: string }) {
       }
     }
 
-  const dialogOpen = kickTarget !== null || askingReveal;
+  const dialogOpen = kickTarget !== null || askingReveal || askingSkip;
   useStageShortcuts((s) => {
-    if (dialogOpen || !next) return;
+    if (dialogOpen) return;
+    if (s === "pause") {
+      if (inQuestion && !busy && !auto.sent) togglePause();
+      return;
+    }
+    if (!next) return;
     if (s === "reveal" && state?.phase !== "question") return;
     next();
   });
@@ -384,6 +436,14 @@ function BigScreen({ pin }: { pin: string }) {
         cancelLabel={t("common.cancel")}
         onConfirm={confirmKick}
         onCancel={() => setKickTarget(null)}
+      />
+      <ConfirmDialog
+        open={askingSkip}
+        message={t("hostGame.skipConfirm")}
+        confirmLabel={t("hostGame.skipOk")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={confirmSkip}
+        onCancel={() => setSkipAskFor(null)}
       />
       <ConfirmDialog
         open={askingReveal}
@@ -610,6 +670,7 @@ function QuestionStage({
   now,
   answered,
   total,
+  paused = false,
 }: {
   state: GameState;
   meta: GameMeta | null | undefined;
@@ -617,6 +678,8 @@ function QuestionStage({
   now: number;
   answered: number;
   total: number;
+  /** host paused the question (`now` is then the frozen pausedAt) */
+  paused?: boolean;
 }) {
   if (!question) return <Loading />;
   const share = total > 0 ? Math.min(1, answered / total) : 0;
@@ -638,6 +701,11 @@ function QuestionStage({
           <Countdown endsAt={state.endsAt} totalSeconds={question.seconds} serverNow={now} size="lg" />
         )}
       </div>
+      {paused && (
+        <p className="stage-paused" role="status">
+          {t("hostGame.paused")}
+        </p>
+      )}
       {question.imageUrl && <img className="stage-question__img" src={question.imageUrl} alt="" />}
       {/* options are only shown once answering opens (not during the "get ready" lead-in) */}
       {!leadIn && (

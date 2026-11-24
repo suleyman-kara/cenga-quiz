@@ -84,6 +84,13 @@ export function parseQIndex(data: unknown): number {
   return q;
 }
 
+/** Extra seconds for extendTime (the range itself is checked by planExtend). */
+export function parseSeconds(data: unknown): number {
+  const v = field(data, "seconds");
+  if (typeof v !== "number" || !Number.isInteger(v)) throw new GameError("invalid-argument", "Geçersiz süre (seconds).");
+  return v;
+}
+
 export function parseHostAction(data: unknown): HostAction {
   const a = field(data, "action");
   if (typeof a !== "string" || !(HOST_ACTIONS as readonly string[]).includes(a)) {

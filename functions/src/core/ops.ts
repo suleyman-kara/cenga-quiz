@@ -89,6 +89,7 @@ export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch
   const { qIndex, startedAt, endsAt } = r.state;
   const q = quiz.questions[qIndex];
   if (!q) throw new GameError("failed-precondition", "Geçersiz soru.");
+  if (r.state.pausedAt) throw new GameError("failed-precondition", "Soru duraklatıldı; önce devam ettirin.");
   if (!canReveal(r, ctx.now)) {
     throw new GameError("failed-precondition", "Cevaplama başlamadan cevap gösterilemez.");
   }
@@ -126,6 +127,60 @@ export function planNext(room: Room | null | undefined, ctx: OpContext): Patch {
   const quiz = needQuiz(ctx);
   const next = r.state.qIndex + 1;
   if (next >= quiz.questions.length) throw new GameError("failed-precondition", "Başka soru kalmadı.");
+  return showQuestion(quiz, next, ctx);
+}
+
+/** Limits for "extend time" (seconds per click). */
+export const EXTEND_SECONDS = { min: 5, max: 120 } as const;
+
+/** Freezes the running question: the clock stops at `now` and answers are refused (rules). */
+export function planPause(room: Room | null | undefined, ctx: OpContext): Patch {
+  const r = guard(room, ctx, "pause");
+  if (r.state.pausedAt) return {};
+  if (ctx.now >= r.state.endsAt) throw new GameError("failed-precondition", "Süre doldu; duraklatılacak bir şey yok.");
+  return { "state/pausedAt": ctx.now, "state/updatedAt": ctx.now };
+}
+
+/**
+ * Continues a paused question. The window moves forward by the pause length, and so does every
+ * answer already given (Functions may rewrite `at`), so each keeps its exact speed and scoring
+ * needs no notion of pauses.
+ */
+export function planResume(room: Room | null | undefined, ctx: OpContext): Patch {
+  const r = guard(room, ctx, "resume");
+  const { pausedAt, qIndex, startedAt, endsAt } = r.state;
+  if (!pausedAt) return {};
+  const shift = Math.max(0, ctx.now - pausedAt);
+  const patch: Patch = {
+    state: { phase: "question", qIndex, startedAt: startedAt + shift, endsAt: endsAt + shift, updatedAt: ctx.now },
+  };
+  for (const [uid, a] of Object.entries(answersFor(r, qIndex))) {
+    if (a && typeof a.at === "number") patch[`answers/${qIndex}/${uid}/at`] = a.at + shift;
+  }
+  return patch;
+}
+
+/** More time for the current question (running or paused). */
+export function planExtend(room: Room | null | undefined, ctx: OpContext, seconds: number): Patch {
+  const r = guard(room, ctx, "extend");
+  if (!Number.isInteger(seconds) || seconds < EXTEND_SECONDS.min || seconds > EXTEND_SECONDS.max) {
+    throw new GameError("invalid-argument", `Ek süre ${EXTEND_SECONDS.min}-${EXTEND_SECONDS.max} saniye olmalı.`);
+  }
+  // while paused the clock stands at pausedAt; otherwise a finished question stays finished
+  const clock = r.state.pausedAt ?? ctx.now;
+  if (clock >= r.state.endsAt) throw new GameError("failed-precondition", "Süre doldu; cevabı gösterin.");
+  return { "state/endsAt": r.state.endsAt + seconds * 1000, "state/updatedAt": ctx.now };
+}
+
+/** Leaves the current question unscored (a broken or unfair question) and shows the next one. */
+export function planSkip(room: Room | null | undefined, ctx: OpContext): Patch {
+  const r = guard(room, ctx, "skip");
+  const quiz = needQuiz(ctx);
+  const next = r.state.qIndex + 1;
+  if (next >= quiz.questions.length) {
+    throw new GameError("failed-precondition", "Son soru atlanamaz; cevabı gösterin ya da oyunu bitirin.");
+  }
+  // a whole new state object: pausedAt goes with the skipped question
   return showQuestion(quiz, next, ctx);
 }
 

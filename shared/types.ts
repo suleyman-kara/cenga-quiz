@@ -128,7 +128,17 @@ export interface GameMeta {
 }
 
 /** Host action currently holding the state lock (see GameState.lock). */
-export type LockAction = "start" | "reveal" | "showLeaderboard" | "next" | "end" | "kick";
+export type LockAction =
+  | "start"
+  | "reveal"
+  | "showLeaderboard"
+  | "next"
+  | "end"
+  | "kick"
+  | "pause"
+  | "resume"
+  | "extend"
+  | "skip";
 
 /**
  * Server-only transition lock. While present (and fresher than ~30 s) the room's inputs are
@@ -152,6 +162,12 @@ export interface GameState {
   startedAt: number;
   endsAt: number;
   updatedAt: number;
+  /**
+   * present while the host paused the question: the clock is frozen at this server time and
+   * answers are refused (rules). Resume moves startedAt/endsAt (and the answers already given)
+   * forward by the pause length.
+   */
+  pausedAt?: number;
   /** present only while a host transition is computing its result */
   lock?: StateLock;
 }
@@ -254,6 +270,11 @@ export interface HostActionMap {
   kickPlayer: { req: { pin: string; uid: string }; res: { ok: true } };
   kickPlayers: { req: { pin: string; uids: string[] }; res: { ok: true } };
   setLobbyLocked: { req: { pin: string; locked: boolean }; res: { ok: true; locked: boolean } };
+  /** live question control: all carry the qIndex the host screen is on (idempotent) */
+  pauseQuestion: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
+  resumeQuestion: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
+  extendTime: { req: { pin: string; qIndex: number; seconds: number }; res: { ok: true; already?: true } };
+  skipQuestion: { req: { pin: string; qIndex: number }; res: { ok: true; already?: true } };
 }
 export type HostAction = keyof HostActionMap;
 export const HOST_ACTIONS: readonly HostAction[] = [
@@ -266,6 +287,10 @@ export const HOST_ACTIONS: readonly HostAction[] = [
   "kickPlayer",
   "kickPlayers",
   "setLobbyLocked",
+  "pauseQuestion",
+  "resumeQuestion",
+  "extendTime",
+  "skipQuestion",
 ];
 export type HostRequest<A extends HostAction = HostAction> = A extends HostAction
   ? { action: A } & HostActionMap[A]["req"]

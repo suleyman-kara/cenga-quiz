@@ -16,6 +16,7 @@ import {
   type Client,
 } from "./helpers";
 import { club } from "../../src/club.config";
+import { ref, serverTimestamp, set } from "firebase/database";
 import type { GameMeta, GameResultDoc, GameState, Leaderboard, PlayerScore, PublicQuestion, RevealData } from "../../shared/types";
 
 let host: Client;
@@ -229,4 +230,48 @@ describe("game flow (host callables)", () => {
     const result = (await adminFs().doc(`gameResults/${resultId}`).get()).data() as GameResultDoc;
     expect(result.results).toEqual([{ uid: "pa", name: "Ali", score: 0, rank: 1, correctCount: 0 }]);
   });
+
+  describe("live question control", () => {
+    it("pause: answers are refused and no reveal; resume: the window and earlier answers move by the pause", async () => {
+      await newGame();
+      await host.call("startGame", { pin });
+      await openAnswering(pin);
+      await adminAnswer(pin, 0, "pa", 1, 500);
+      const before = await state();
+      expect(await host.call("pauseQuestion", { pin, qIndex: 0 })).toEqual({ ok: true });
+      expect(await host.call("pauseQuestion", { pin, qIndex: 0 })).toEqual({ ok: true, already: true });
+      const p = await state();
+      expect(p.pausedAt).toBeGreaterThan(0);
+      expect(await expectCode(host.call("reveal", { pin, qIndex: 0 }))).toBe("functions/failed-precondition");
+      // a player's own write while paused is refused by the rules
+      const player = await signInAnon();
+      await adminJoin(pin, player.uid, "Duru");
+      await expect(set(ref(player.db, `games/${pin}/answers/0/${player.uid}`), { choice: 1, at: serverTimestamp() })).rejects.toThrow();
+      await new Promise((r) => setTimeout(r, 400));
+      expect(await host.call("resumeQuestion", { pin, qIndex: 0 })).toEqual({ ok: true });
+      const after = await state();
+      expect(after.pausedAt).toBeUndefined();
+      const shift = after.startedAt - before.startedAt;
+      expect(shift).toBeGreaterThanOrEqual(400);
+      expect(after.endsAt - before.endsAt).toBe(shift);
+      const a = await readRoom<{ at: number }>(pin, "answers/0/pa");
+      expect(a.at - after.startedAt).toBe(500);
+    });
+
+    it("extendTime adds seconds; skipQuestion moves on without scoring", async () => {
+      await newGame();
+      await host.call("startGame", { pin });
+      await openAnswering(pin);
+      const s0 = await state();
+      expect(await host.call("extendTime", { pin, qIndex: 0, seconds: 15 })).toEqual({ ok: true });
+      expect((await state()).endsAt).toBe(s0.endsAt + 15_000);
+      expect(await expectCode(host.call("extendTime", { pin, qIndex: 0, seconds: 999 }))).toBe("functions/invalid-argument");
+      await adminAnswer(pin, 0, "pa", 1, 100);
+      expect(await host.call("skipQuestion", { pin, qIndex: 0 })).toEqual({ ok: true });
+      expect(await host.call("skipQuestion", { pin, qIndex: 0 })).toEqual({ ok: true, already: true });
+      expect(await state()).toMatchObject({ phase: "question", qIndex: 1 });
+      expect(await scores()).toBeNull();
+    });
+  });
 });
+

@@ -149,7 +149,8 @@ export function PlayerGame() {
             pin={pin}
             state={state}
             question={question?.index === state.qIndex ? question : null}
-            now={now}
+            // paused by the host: the clock stands at pausedAt
+            now={state.pausedAt ? Math.min(now, state.pausedAt) : now}
             lost={lost}
           />
         );
@@ -324,7 +325,7 @@ function QuestionView({
     }
   };
   const choose = (i: number) => {
-    if (busy || timeUp || leadIn || question.options.length < question.optionCount) return;
+    if (busy || timeUp || leadIn || state.pausedAt || question.options.length < question.optionCount) return;
     setSub({ kind: "sending", choice: i });
     navigator.vibrate?.(30);
     let settled = false;
@@ -372,7 +373,8 @@ function QuestionView({
 
   // answering opened but the options are still on their way (a few ms): shapes only, not tappable
   const loading = question.options.length < question.optionCount;
-  const locked = busy || timeUp || leadIn || loading;
+  const paused = !!state.pausedAt;
+  const locked = busy || timeUp || leadIn || loading || paused;
   const picked = sub.kind === "sending" || sub.kind === "sent" ? sub.choice : null;
   const secs = remainingSeconds(state.endsAt, now);
   return (
@@ -399,6 +401,14 @@ function QuestionView({
           <p className="getready__num" aria-hidden="true">
             {remainingSeconds(state.startedAt, now)}
           </p>
+        </div>
+      ) : paused && sub.kind !== "sent" && sub.kind !== "sending" ? (
+        <div className="locked locked--timeup" role="status">
+          <svg className="locked__clock" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M9 6v12M15 6v12" />
+          </svg>
+          <p className="locked__title">{t("hostGame.paused")}</p>
+          <p className="locked__hint">{t("player.paused")}</p>
         </div>
       ) : sub.kind === "sending" && picked !== null ? (
         <div className="locked locked--sending" data-choice={picked} role="status">

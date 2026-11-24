@@ -53,6 +53,8 @@ canlı quiz sistemi.
 - **Kulübe özel görünüm:** Ad, logo, renkler, fontlar, şık şekilleri ve final
   ekranı tek bir dosyada (`src/club.config.ts`).
 - **Lobi güvenliği:** Takma ad filtresi, en fazla 300 oyuncu (ayarlanabilir).
+- **Canlı kontrol:** Soru sırasında duraklat / devam, +15 saniye ve hatalı soruyu
+  puanlamadan atlama. Klavye ve sunum kumandasıyla yönetim (Space, R, P).
 - **Sonuçlar ve istatistik:** Panelde geçmiş oyunlar listelenir; her biri için
   sıralama ve soru bazında doğru cevap oranı CSV olarak indirilir. Yarım kalan
   (açık) oyunlara panelden dönülür.

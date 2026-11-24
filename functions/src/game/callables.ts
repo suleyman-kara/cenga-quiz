@@ -2,7 +2,7 @@ import type { GameMeta, HostAction, HostActionMap, LiveGameDoc, LockAction, Quiz
 import { validateQuiz } from "../../../shared/quizValidate";
 import { club } from "../../../src/club.config";
 import type { AuthLike } from "../core/auth";
-import { parseBool, parseHostAction, parsePin, parseQIndex, parseQuizId, parseUid, parseUids } from "../core/auth";
+import { parseBool, parseHostAction, parsePin, parseQIndex, parseQuizId, parseSeconds, parseUid, parseUids } from "../core/auth";
 import { stepStatus } from "../core/transitions";
 import { GameError } from "../core/errors";
 import { allocatePin, securePin } from "../core/pin";
@@ -12,7 +12,11 @@ import {
   assertHost,
   guard,
   planEnd,
+  planExtend,
   planKickMany,
+  planPause,
+  planResume,
+  planSkip,
   planNext,
   planReveal,
   planSetLobbyLocked,
@@ -119,7 +123,11 @@ const SPECS = {
     parts: ["players", "scores", "leaderboard", "banned", "stats"],
     precheck: false,
   },
-} satisfies Record<Exclude<LockAction, "kick">, TransitionSpec>;
+  pause: { action: "pause", plan: planPause, needsQuiz: false, parts: [], precheck: true, step: true },
+  // answers: resume moves the ones already given forward by the pause length
+  resume: { action: "resume", plan: planResume, needsQuiz: false, parts: ["answers"], precheck: false, step: true },
+  skip: { action: "skip", plan: planSkip, needsQuiz: true, parts: [], precheck: true, step: true },
+} satisfies Record<Exclude<LockAction, "kick" | "extend">, TransitionSpec>;
 
 /**
  * Host transition without a room-wide transaction:
@@ -208,6 +216,31 @@ export async function endGame(auth: AuthLike | undefined, data: unknown): Res<"e
   return { ok: true, resultId };
 }
 
+export async function pauseQuestion(auth: AuthLike | undefined, data: unknown): Res<"pauseQuestion"> {
+  return stepResult((await transition(auth, data, SPECS.pause)).already);
+}
+
+export async function resumeQuestion(auth: AuthLike | undefined, data: unknown): Res<"resumeQuestion"> {
+  return stepResult((await transition(auth, data, SPECS.resume)).already);
+}
+
+export async function extendTime(auth: AuthLike | undefined, data: unknown): Res<"extendTime"> {
+  const seconds = parseSeconds(data);
+  const spec: TransitionSpec = {
+    action: "extend",
+    plan: (room, ctx) => planExtend(room, ctx, seconds),
+    needsQuiz: false,
+    parts: [],
+    precheck: true,
+    step: true,
+  };
+  return stepResult((await transition(auth, data, spec)).already);
+}
+
+export async function skipQuestion(auth: AuthLike | undefined, data: unknown): Res<"skipQuestion"> {
+  return stepResult((await transition(auth, data, SPECS.skip)).already);
+}
+
 /**
  * Kicks run under the same state lock as the transitions, so a kick can never interleave with a
  * reveal/start that already read the players (ghost scores, re-created banned entries). While
@@ -261,6 +294,10 @@ const HANDLERS: { [A in HostAction]: Handler<A> } = {
   kickPlayer,
   kickPlayers,
   setLobbyLocked,
+  pauseQuestion,
+  resumeQuestion,
+  extendTime,
+  skipQuestion,
 };
 
 /** The single `host` callable: `{ action, ...args }` → that action's handler. */

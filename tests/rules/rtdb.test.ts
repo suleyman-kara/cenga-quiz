@@ -521,3 +521,13 @@ describe("RTDB: options (published with the question, readable by players only o
   });
 });
 
+describe("RTDB: answers while the host paused the question", () => {
+  it("are refused, and accepted again once resumed", async () => {
+    await seed({ phase: "question" });
+    await owner().ref(`${G}/state/pausedAt`).set(Date.now());
+    await assertFails(player(P1).ref(`${G}/answers/0/${P1}`).set({ choice: 1, at: serverTimestamp() }));
+    await owner().ref(`${G}/state/pausedAt`).remove();
+    await assertSucceeds(player(P1).ref(`${G}/answers/0/${P1}`).set({ choice: 1, at: serverTimestamp() }));
+  });
+});
+

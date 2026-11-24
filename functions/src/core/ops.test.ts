@@ -8,6 +8,10 @@ import {
   planKick,
   planKickMany,
   planSetLobbyLocked,
+  planPause,
+  planResume,
+  planExtend,
+  planSkip,
 } from "./ops";
 import { applyPatch, type Room } from "./room";
 import { GameError } from "./errors";
@@ -432,3 +436,61 @@ describe("planKickMany", () => {
     expect(errCode(() => planKickMany(lobbyRoom(), { ...host, uid: "x", now: 1 }, ["p1"]))).toBe("permission-denied");
   });
 });
+
+describe("live question control", () => {
+  // started(10_000): question 0 runs 10 000 → 20 000 (10 s, no lead-in in the fixture config)
+  const paused = (at = 14_000) => {
+    const r = applyPatch(started(10_000), { "answers/0/p1": { choice: 2, at: 12_000 } }) as Room;
+    return applyPatch(r, planPause(r, { ...host, now: at })) as Room;
+  };
+
+  it("pause freezes the question: pausedAt is set, nothing else moves", () => {
+    const r = paused(14_000);
+    expect(r.state).toMatchObject({ phase: "question", qIndex: 0, startedAt: 10_000, endsAt: 20_000, pausedAt: 14_000 });
+  });
+
+  it("no pause once the time is up, and none outside a question", () => {
+    expect(errCode(() => planPause(started(10_000), { ...host, now: 20_000 }))).toBe("failed-precondition");
+    expect(errCode(() => planPause(lobbyRoom(), { ...host, now: 1 }))).toBe("failed-precondition");
+  });
+
+  it("resume shifts the window AND the answers already given by the pause length, so scoring is unchanged", () => {
+    const r = paused(14_000);
+    const out = applyPatch(r, planResume(r, { ...host, now: 44_000 })) as Room;
+    expect(out.state).toEqual({ phase: "question", qIndex: 0, startedAt: 40_000, endsAt: 50_000, updatedAt: 44_000 });
+    // the answer given 2 s into the question is still 2 s into it
+    expect((out.answers as Record<string, Record<string, { at: number }>>)["0"].p1.at).toBe(42_000);
+  });
+
+  it("no reveal while paused", () => {
+    expect(errCode(() => planReveal(paused(), { ...host, now: 15_000 }))).toBe("failed-precondition");
+  });
+
+  it("extend adds seconds to the running (or paused) question; within limits", () => {
+    const r = started(10_000);
+    expect(applyPatch(r, planExtend(r, { ...host, now: 15_000 }, 15)).state?.endsAt).toBe(35_000);
+    expect(applyPatch(paused(), planExtend(paused(), { ...host, now: 15_000 }, 15)).state?.endsAt).toBe(35_000);
+    expect(errCode(() => planExtend(r, { ...host, now: 15_000 }, 0))).toBe("invalid-argument");
+    expect(errCode(() => planExtend(r, { ...host, now: 15_000 }, 1000))).toBe("invalid-argument");
+    // time already up: the auto-reveal is due, no reopening
+    expect(errCode(() => planExtend(r, { ...host, now: 21_000 }, 15))).toBe("failed-precondition");
+  });
+
+  it("skip goes to the next question without scoring this one (no reveal, scores untouched)", () => {
+    const r = applyPatch(started(10_000), { "answers/0/p1": { choice: 2, at: 12_000 } }) as Room;
+    const patch = planSkip(r, { ...host, now: 15_000 });
+    const out = applyPatch(r, patch) as Room;
+    expect(out.state).toMatchObject({ phase: "question", qIndex: 1 });
+    expect(out.question).toMatchObject({ index: 1 });
+    expect(out.scores).toEqual(r.scores);
+    expect(Object.keys(patch).some((k) => k.startsWith("scores") || k.startsWith("stats"))).toBe(false);
+  });
+
+  it("skip also works while paused (the pause ends with the question); the last question cannot be skipped", () => {
+    const out = applyPatch(paused(), planSkip(paused(), { ...host, now: 15_000 })) as Room;
+    expect(out.state?.pausedAt).toBeUndefined();
+    const last = applyPatch(started(10_000), { "state/qIndex": 1 }) as Room;
+    expect(errCode(() => planSkip(last, { ...host, now: 15_000 }))).toBe("failed-precondition");
+  });
+});
+
