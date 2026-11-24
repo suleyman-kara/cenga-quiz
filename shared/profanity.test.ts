@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { isNameAllowed, normalizeForMatch } from "./profanity";
+import { club } from "../src/club.config";
 
 describe("normalizeForMatch", () => {
   it("lowercases with Turkish dotted/dotless i and folds Turkish letters", () => {
@@ -38,5 +39,21 @@ describe("isNameAllowed", () => {
     ["english token", "dick"],
   ])("blocks %s (%s)", (_label, name) => {
     expect(isNameAllowed(name)).toBe(false);
+  });
+});
+
+describe("reserved names (no impersonating the host or the club)", () => {
+  it.each(["Host", "SUNUCU", "admin", "Moderatör", "Yönetici", "Admin Ali", "h0st", "s.u.n.u.c.u"])("blocks %s", (name) => {
+    expect(isNameAllowed(name)).toBe(false);
+  });
+  it("blocks the club's own name, also inside a longer name", () => {
+    const short = club.shortName;
+    expect(isNameAllowed(short)).toBe(false);
+    expect(isNameAllowed(short.toLowerCase())).toBe(false);
+    expect(isNameAllowed(`${short} Ekibi`)).toBe(false);
+    expect(isNameAllowed(`${short}official`)).toBe(false);
+  });
+  it.each(["Ali", "Hostes Ayşe", "Sunay", "Adem"])("still allows ordinary names like %s", (name) => {
+    expect(isNameAllowed(name)).toBe(true);
   });
 });

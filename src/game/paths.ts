@@ -13,4 +13,5 @@ export const paths = {
   leaderboard: (pin: string) => `${gamePath(pin)}/leaderboard`,
   banned: (pin: string, uid: string) => `${gamePath(pin)}/banned/${uid}`,
   hostOnline: (pin: string) => `${gamePath(pin)}/hostOnline`,
+  options: (pin: string, qIndex: number) => `${gamePath(pin)}/options/${qIndex}`,
 };

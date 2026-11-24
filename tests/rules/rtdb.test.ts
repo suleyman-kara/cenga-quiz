@@ -39,7 +39,8 @@ async function seed(opts: SeedOpts = {}) {
   };
   const game: Record<string, unknown> = {
     state,
-    question: { index: qIndex, text: "Soru?", options: ["A", "B", "C", "D"], seconds: 20 },
+    question: { index: qIndex, text: "Soru?", optionCount: 4, seconds: 20 },
+    options: { [qIndex]: ["A", "B", "C", "D"] },
     reveal: { qIndex: 0, correct: 1, counts: [0, 1, 0, 0] },
     players: {
       [P1]: { name: "Ayşe", joinedAt: now - 10_000 },
@@ -386,7 +387,7 @@ describe("RTDB: answers", () => {
   });
   it("respects the actual option count (2-option question)", async () => {
     await seed({ phase: "question", qIndex: 0 });
-    await owner().ref(`${G}/question/options`).set(["Doğru", "Yanlış"]);
+    await owner().ref(`${G}/question/optionCount`).set(2);
     await assertFails(answer(P1, 0, 2));
     await assertSucceeds(answer(P1, 0, 1));
   });
@@ -488,6 +489,35 @@ describe("RTDB: server-only bookkeeping", () => {
       await assertFails(player(P1).ref(path).get());
       await assertFails(player(P1).ref(path).set(null));
     }
+  });
+});
+
+describe("RTDB: options (published with the question, readable by players only once answering opens)", () => {
+  async function seedQuestion(startedAt: number) {
+    await seed({ phase: "question" });
+    await owner().ref(`${G}/state/startedAt`).set(startedAt);
+    await owner().ref(`${G}/options/0`).set(["A", "B", "C", "D"]);
+    await owner().ref(`${G}/options/1`).set(["E", "F"]);
+  }
+  it("players cannot read the options during the lead-in (bots cannot pre-read them)", async () => {
+    await seedQuestion(Date.now() + 60_000);
+    await assertFails(player(P1).ref(`${G}/options/0`).get());
+  });
+  it("players read the current question's options once answering opened", async () => {
+    await seedQuestion(Date.now() - 1000);
+    await assertSucceeds(player(P1).ref(`${G}/options/0`).get());
+  });
+  it("never another question's options, never as an outsider, never the whole list", async () => {
+    await seedQuestion(Date.now() - 1000);
+    await assertFails(player(P1).ref(`${G}/options/1`).get());
+    await assertFails(player(OUTSIDER).ref(`${G}/options/0`).get());
+    await assertFails(player(P1).ref(`${G}/options`).get());
+  });
+  it("the host reads them any time; nobody writes them from a client", async () => {
+    await seedQuestion(Date.now() + 60_000);
+    await assertSucceeds(host().ref(`${G}/options/0`).get());
+    await assertFails(host().ref(`${G}/options/0`).set(["x"]));
+    await assertFails(player(P1).ref(`${G}/options/0`).set(["x"]));
   });
 });
 

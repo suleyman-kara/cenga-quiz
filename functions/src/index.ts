@@ -10,6 +10,7 @@ import { callLog } from "./core/callLog";
 import { dispatchHost } from "./game/callables";
 import { createCheckHostEmail } from "./game/checkHost";
 import { hostCheck } from "./game/hostAuth";
+import { createLimiter } from "./game/rateLimit";
 import { runCleanup } from "./game/cleanup";
 import { onPlayerJoined, onPlayerLeft } from "./game/joins";
 import { databaseTriggerRegion } from "./game/firebase";
@@ -48,7 +49,11 @@ export const host = onCall({ minInstances: MIN_INSTANCES, enforceAppCheck: ENFOR
   }
 });
 
-const checkHostEmailImpl = createCheckHostEmail((email) => hostCheck.isAllowed(email));
+/** 20 checks per hour per caller IP: enough for a real sign-up, too few to test an address list. */
+const checkHostEmailImpl = createCheckHostEmail(
+  (email) => hostCheck.isAllowed(email),
+  createLimiter("checkHostEmail", { limit: 20, windowMs: 60 * 60_000 }),
+);
 
 /**
  * Sign-up pre-check: `{ email }` → `{ allowed }` for that one address (callers need not be signed in).
@@ -58,7 +63,7 @@ export const checkHostEmail = onCall(
   { minInstances: MIN_INSTANCES, enforceAppCheck: ENFORCE_APP_CHECK },
   async (req) => {
     try {
-      return await checkHostEmailImpl(req.data);
+      return await checkHostEmailImpl(req.data, req.rawRequest?.ip ?? "unknown");
     } catch (e) {
       if (e instanceof GameError) throw new HttpsError(e.code, e.message);
       logger.error("checkHostEmail failed", e);

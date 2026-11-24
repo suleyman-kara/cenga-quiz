@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { GameState, PlayerScore, PublicQuestion } from "../../shared/types";
+import type { GameState, PlayerScore, ShownQuestion } from "../../shared/types";
 import { translate } from "../i18n";
 import { club } from "../club.config";
 import { PlayerGame } from "./PlayerGame";
@@ -26,6 +26,7 @@ vi.mock("../game/hooks", () => ({
   useMyPlayer: vi.fn(),
   useBanned: vi.fn(),
   useHostOnline: vi.fn(),
+  useQuestionOptions: vi.fn(),
 }));
 const conn = vi.hoisted(() => ({ lost: false }));
 vi.mock("../game/connection", () => ({ useConnectionLost: () => conn.lost }));
@@ -39,7 +40,7 @@ const state = (phase: GameState["phase"], qIndex = 0): GameState => ({
   endsAt: phase === "question" ? 21_000 : 0,
   updatedAt: 1_000,
 });
-const question: PublicQuestion = { index: 0, text: "Başkent?", options: ["İzmir", "Ankara", "Bursa"], seconds: 20 };
+const question: ShownQuestion = { index: 0, text: "Başkent?", optionCount: 3, options: ["İzmir", "Ankara", "Bursa"], seconds: 20 };
 const score = (p: Partial<PlayerScore> = {}): PlayerScore => ({
   score: 1850,
   streak: 2,
@@ -80,6 +81,7 @@ describe("PlayerGame", () => {
     vi.mocked(fetchOwnAnswer).mockReset().mockResolvedValue(null);
     conn.lost = false;
     vi.mocked(hooks.useHostOnline).mockReturnValue(true);
+    vi.mocked(hooks.useQuestionOptions).mockReturnValue(question.options);
   });
 
   it("sends players without a session for this PIN back to the join screen", async () => {
@@ -645,6 +647,25 @@ describe("PlayerGame", () => {
         expect(screen.queryByText(t("player.hostAway"))).not.toBeInTheDocument();
         v.unmount();
       }
+    });
+  });
+
+  describe("options arrive only once answering opens", () => {
+    it("asks for the current question's options at its startedAt", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      renderPlay();
+      expect(hooks.useQuestionOptions).toHaveBeenLastCalledWith("123456", 0, 1_000);
+    });
+
+    it("while they load: one disabled shape button per option, no text yet", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(hooks.useQuestionOptions).mockReturnValue(undefined);
+      vi.mocked(hooks.useQuestion).mockReturnValue({ ...question, options: undefined } as never);
+      renderPlay();
+      const buttons = document.querySelectorAll(".choice-grid button");
+      expect(buttons).toHaveLength(3);
+      for (const b of buttons) expect(b).toBeDisabled();
+      expect(screen.queryByText("Ankara")).not.toBeInTheDocument();
     });
   });
 });

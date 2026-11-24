@@ -37,8 +37,10 @@ canlı quiz sistemi.
 - **QR ile katılım:** Lobide büyük bir QR kodu var; okutan oyuncu PIN yazmadan takma
   ad ekranına gelir.
 - **Adil puanlama:** Puan sunucuda hesaplanır. "Hazır olun" sırasında sadece soru
-  görünür, şıklar süre herkes için aynı anda başlayınca gelir. Hız puanı (en fazla
-  1000) ve azalan adımlı seri bonusu (+40, +70, +90, +100).
+  görünür, şıklar süre herkes için aynı anda başlayınca gelir. Şıklar o ana kadar
+  telefona hiç gönderilmez (güvenlik kuralları okumayı engeller), yani bir script de
+  onları önceden okuyamaz. Hız puanı (en fazla 1000) ve azalan adımlı seri bonusu
+  (+40, +70, +90, +100).
 - **Son sorularda 2× puan:** Son 3 soru (ayarlanabilir) çift puan değerindedir.
 - **Heyecanlı sıralama:** Satırlar önceki yerinden kayarak gelir; yükselen/düşen
   okları, seri alevi, lider tacı ve "En çok yükselen". Telefonda "2 sıra yükseldin"

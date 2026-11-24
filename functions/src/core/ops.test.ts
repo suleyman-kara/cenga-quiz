@@ -309,7 +309,13 @@ describe("planKick", () => {
   });
   it("works in the lobby (no leaderboard written) and for unknown uids", () => {
     const patch = planKick(lobbyRoom(), { ...host, now: 1 }, "ghost");
-    expect(patch).toEqual({ "players/ghost": null, "scores/ghost": null, "banned/ghost": true, "meta/lastActivityAt": 1 });
+    expect(patch).toEqual({
+      "players/ghost": null,
+      "scores/ghost": null,
+      "banned/ghost": true,
+      "meta/lastActivityAt": 1,
+      "meta/locked": true,
+    });
   });
   it("host only, not after the game ended", () => {
     expect(errCode(() => planKick(lobbyRoom(), { ...host, uid: "x", now: 1 }, "p1"))).toBe("permission-denied");
@@ -385,6 +391,13 @@ describe("banned uids and partial player entries (kick races)", () => {
 });
 
 describe("planKickMany", () => {
+  it("a kick in the lobby also locks it: the kicked player cannot come back with a new anonymous account", () => {
+    const patch = planKickMany(lobbyRoom(), { ...host, now: 1 }, ["p1"]);
+    expect(patch).toMatchObject({ "meta/locked": true, "banned/p1": true });
+  });
+  it("after the start (joins are closed anyway) the lock is left alone", () => {
+    expect(planKickMany(revealed(), { ...host, now: 1 }, ["p1"])).not.toHaveProperty("meta/locked");
+  });
   it("removes, unscores and bans every target in one patch", () => {
     const r = applyPatch(revealed(), { "players/p5": { name: "Can", joinedAt: 1600 } }) as Room;
     const patch = planKickMany(r, { ...host, now: 1 }, ["p1", "p5"]);

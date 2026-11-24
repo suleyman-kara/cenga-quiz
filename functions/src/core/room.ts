@@ -113,7 +113,7 @@ export function publicQuestion(quiz: Quiz, index: number, defaultSeconds: number
   const pq: PublicQuestion = {
     index,
     text: q.text,
-    options: [...q.options],
+    optionCount: q.options.length,
     seconds: questionSeconds(q, defaultSeconds),
   };
   if (q.imageUrl) pq.imageUrl = q.imageUrl;
@@ -122,8 +122,8 @@ export function publicQuestion(quiz: Quiz, index: number, defaultSeconds: number
 }
 
 /**
- * One multi-path update that shows question `index`. The question is published now; the clock
- * (and answer acceptance, see rules) starts `leadInMs` later so every phone has it first.
+ * One multi-path update that shows question `index`. The question text is published now; the clock,
+ * answer acceptance and reading the options (see rules) start `leadInMs` later.
  */
 export function questionPatch(
   quiz: Quiz,
@@ -142,7 +142,8 @@ export function questionPatch(
     endsAt: startedAt + question.seconds * 1000,
     updatedAt: now,
   };
-  return { question, reveal: null, state };
+  // options in their own node: the rules let players read them only from startedAt on
+  return { question, [`options/${index}`]: [...quiz.questions[index].options], reveal: null, state };
 }
 
 export function answersFor(room: Room, qIndex: number): Record<string, AnswerEntry> {

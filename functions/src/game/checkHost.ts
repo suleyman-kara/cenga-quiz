@@ -22,11 +22,20 @@ export function parseHostEmail(data: unknown): string {
 /**
  * Sign-up pre-check for the host panel: answers only "is this one address on the allow-list?".
  * A UX gate so non-hosts are not asked to create an account; the security boundary stays in the
- * Firestore rules and the `host` callable (verified e-mail + allowedHosts). Works for signed-out callers.
+ * Firestore rules and the `host` callable (verified e-mail + allowedHosts). Works for signed-out
+ * callers, so it is rate limited per caller IP: nobody can test a list of addresses to learn who
+ * the hosts are.
  */
-export function createCheckHostEmail(isAllowed: (email: string) => Promise<boolean>) {
-  return async (data: unknown): Promise<CheckHostEmailResponse> => {
+export function createCheckHostEmail(
+  isAllowed: (email: string) => Promise<boolean>,
+  /** resolves false once `caller` used up its quota */
+  limiter: (caller: string) => Promise<boolean> = async () => true,
+) {
+  return async (data: unknown, caller = "unknown"): Promise<CheckHostEmailResponse> => {
     const email = parseHostEmail(data);
+    if (!(await limiter(caller))) {
+      throw new GameError("resource-exhausted", "Çok fazla deneme. Biraz sonra tekrar deneyin.");
+    }
     return { allowed: Boolean(await isAllowed(email)) };
   };
 }
