@@ -4,7 +4,7 @@
  * until the kick has had its chance to write — the window the old unlocked kick raced into.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { adminAnswer, adminDb, adminFs, adminJoin, allowHost, readRoom, resetEmulators, testQuiz } from "./helpers";
+import { adminAnswer, adminDb, adminFs, adminJoin, allowHost, openAnswering, readRoom, resetEmulators, testQuiz } from "./helpers";
 import type { Leaderboard, PlayerEntry, PlayerScore } from "../../shared/types";
 import type { RoomPart } from "../../functions/src/game/rooms";
 
@@ -108,6 +108,7 @@ describe("kick interleaved with transitions (in-process)", () => {
     const uids = ["ia", "ib", "ic"];
     const pin = await lobby(uids);
     await startGame(HOST, { pin });
+    await openAnswering(pin);
     for (const uid of uids) await adminAnswer(pin, 0, uid, 1, 500);
     await interleave(pin, "ib", () => reveal(HOST, { pin, qIndex: 0 }));
     const scores = (await readRoom<Record<string, PlayerScore>>(pin, "scores")) ?? {};

@@ -137,6 +137,17 @@ export async function adminJoin(pin: string, uid: string, name: string): Promise
 }
 
 /** Admin-side answer; `offsetMs` → explicit time relative to the question start for deterministic scores. */
+/**
+ * Skips the "Hazır olun" lead-in: moves the current question window so answering opened just now
+ * (same duration). Reveal is refused during the lead-in, so tests that reveal call this first.
+ */
+export async function openAnswering(pin: string): Promise<void> {
+  const ref = adminDb().ref(`games/${pin}/state`);
+  const s = (await ref.get()).val() as { startedAt: number; endsAt: number };
+  const startedAt = Date.now() - 1;
+  await ref.update({ startedAt, endsAt: startedAt + (s.endsAt - s.startedAt) });
+}
+
 export async function adminAnswer(pin: string, qIndex: number, uid: string, choice: number, offsetMs?: number) {
   let at: number | object = ServerValue.TIMESTAMP;
   if (offsetMs !== undefined) {
