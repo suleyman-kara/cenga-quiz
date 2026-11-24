@@ -1,17 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type { GameState, PlayerScore, ShownQuestion } from "../../shared/types";
 import { translate } from "../i18n";
 import { club } from "../club.config";
 import { PlayerGame } from "./PlayerGame";
 import * as hooks from "../game/hooks";
-import { fetchOwnAnswer, submitAnswer } from "../game/actions";
+import { fetchOwnAnswer, leaveLobby, submitAnswer } from "../game/actions";
 import { loadLastSession, loadSession, saveSession } from "../game/session";
 
 vi.mock("../firebase", () => ({ call: vi.fn() }));
-vi.mock("../game/actions", () => ({ checkGame: vi.fn(), joinGame: vi.fn(), submitAnswer: vi.fn(), fetchOwnAnswer: vi.fn() }));
+vi.mock("../game/actions", () => ({
+  checkGame: vi.fn(),
+  joinGame: vi.fn(),
+  submitAnswer: vi.fn(),
+  fetchOwnAnswer: vi.fn(),
+  leaveLobby: vi.fn(),
+}));
 vi.mock("../game/hooks", () => ({
   usePlayerUid: vi.fn(),
   useGameState: vi.fn(),
@@ -668,5 +674,51 @@ describe("PlayerGame", () => {
       expect(screen.queryByText("Ankara")).not.toBeInTheDocument();
     });
   });
+
+  describe("lobby", () => {
+    const meta = (p: Record<string, unknown> = {}) => ({ hostUid: "h", quizId: "q", title: "T", createdAt: 0, questionCount: 3, ...p });
+
+    it("shows how many players joined so far", () => {
+      vi.mocked(hooks.useMeta).mockReturnValue(meta({ playerCount: 37 }));
+      renderPlay();
+      expect(screen.getByText(t("player.lobbyCount", { count: 37 }))).toBeInTheDocument();
+    });
+
+    it("leave / change name: asks, removes the own entry and goes back to the join screen with the PIN", async () => {
+      vi.mocked(leaveLobby).mockReset().mockResolvedValue(undefined);
+      vi.mocked(hooks.useMeta).mockReturnValue(meta());
+      render(
+        <MemoryRouter initialEntries={["/play/123456"]}>
+          <Routes>
+            <Route path="/" element={<JoinProbe />} />
+            <Route path="/play/:pin" element={<PlayerGame />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: t("player.leaveLobby") }));
+      const dialog = screen.getByRole("alertdialog", { name: t("player.leaveConfirm") });
+      await userEvent.click(within(dialog).getByRole("button", { name: t("player.leaveOk") }));
+      expect(leaveLobby).toHaveBeenCalledWith("123456");
+      expect(await screen.findByText("JOIN ?pin=123456")).toBeInTheDocument();
+      expect(loadSession("123456")).toBeNull();
+    });
+
+    it("warns that a locked lobby cannot be re-entered", async () => {
+      vi.mocked(hooks.useMeta).mockReturnValue(meta({ locked: true }));
+      renderPlay();
+      await userEvent.click(screen.getByRole("button", { name: t("player.leaveLobby") }));
+      expect(screen.getByRole("alertdialog", { name: t("player.leaveConfirmLocked") })).toBeInTheDocument();
+    });
+
+    it("no leave button once the game started", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      renderPlay();
+      expect(screen.queryByRole("button", { name: t("player.leaveLobby") })).not.toBeInTheDocument();
+    });
+  });
 });
+
+function JoinProbe() {
+  return <div>JOIN {useLocation().search}</div>;
+}
 

@@ -1801,3 +1801,9 @@
   text-align: center;
   font-weight: 600;
 }
+
+.lobby-count {
+  margin: 0;
+  font-weight: 700;
+  font-size: var(--fs-lg);
+}

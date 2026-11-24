@@ -1,4 +1,4 @@
-import type { GameResultDoc, Leaderboard, PlayerScore } from "../../../shared/types";
+import type { GameResultDoc, Leaderboard, PlayerScore, QuestionStat } from "../../../shared/types";
 import { emptyScore, leaderboardEntry, rankScores } from "../../../shared/scoring";
 import { activePlayers, type Room } from "./room";
 
@@ -58,6 +58,18 @@ export function buildGameResult(room: Room, opts: { pin: string; now: number; re
     playerCount: Object.keys(activePlayers(room)).length,
     questionCount: meta?.questionCount ?? 0,
     expireAt: new Date(opts.now + opts.retentionDays * DAY_MS),
+    questions: questionStats(room),
     results: rankedResults(room),
   };
 }
+
+/** stats/{qIndex} of the room as a list in question order. */
+export function questionStats(room: Room): QuestionStat[] {
+  const raw = room.stats ?? {};
+  const entries = Array.isArray(raw) ? raw.map((v, i) => [String(i), v] as const) : Object.entries(raw);
+  return entries
+    .filter((e): e is readonly [string, Omit<QuestionStat, "index">] => !!e[1])
+    .map(([i, v]) => ({ index: Number(i), text: v.text, correct: v.correct, counts: [...(v.counts ?? [])], players: v.players }))
+    .sort((a, b) => a.index - b.index);
+}
+

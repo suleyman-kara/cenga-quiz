@@ -26,6 +26,7 @@ import {
 } from "../host/quizDraft";
 import { parseQuestionsText } from "../host/quizText";
 import { downloadQuiz } from "../host/quizFile";
+import { IMAGE_LIMITS, checkImageFile, uploadQuizImage } from "../host/imageUpload";
 import { Layout } from "../components/Layout";
 import { Loading } from "../components/Loading";
 import { ChoiceShape } from "../components/ChoiceShape";
@@ -64,6 +65,25 @@ function Editor({ id, user }: { id: string; user: HostUser }) {
   const [notice, setNotice] = useState<string | null>(null);
   const dragFrom = useRef<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
+  // per question: an image upload in progress, or its error
+  const [imageUpload, setImageUpload] = useState<Record<number, { busy?: true; error?: string }>>({});
+
+  async function pickImage(qi: number, file: File | undefined) {
+    if (!file) return;
+    const problem = checkImageFile(file);
+    if (problem) {
+      setImageUpload((s) => ({ ...s, [qi]: { error: t(problem === "type" ? "editor.imageBadType" : "editor.imageTooBig") } }));
+      return;
+    }
+    setImageUpload((s) => ({ ...s, [qi]: { busy: true } }));
+    try {
+      const url = await uploadQuizImage(user.uid, file);
+      edit((d) => updateQuestion(d, qi, { imageUrl: url }));
+      setImageUpload((s) => ({ ...s, [qi]: {} }));
+    } catch {
+      setImageUpload((s) => ({ ...s, [qi]: { error: t("editor.imageUploadFailed") } }));
+    }
+  }
 
   useEffect(() => {
     if (isNew) return;
@@ -421,6 +441,24 @@ function Editor({ id, user }: { id: string; user: HostUser }) {
                           value={q.imageUrl}
                           onChange={(e) => edit((d) => updateQuestion(d, qi, { imageUrl: e.target.value }))}
                         />
+                        <label className="btn btn--ghost btn--small editor-q__upload" aria-busy={imageUpload[qi]?.busy}>
+                          {imageUpload[qi]?.busy ? t("editor.imageUploading") : t("editor.imageUpload")}
+                          <input
+                            type="file"
+                            className="sr-only"
+                            accept={IMAGE_LIMITS.types.join(",")}
+                            disabled={!!imageUpload[qi]?.busy}
+                            onChange={(e) => {
+                              void pickImage(qi, e.target.files?.[0]);
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        {imageUpload[qi]?.error && (
+                          <p className="field__error" role="alert">
+                            {imageUpload[qi]?.error}
+                          </p>
+                        )}
                         {isPreviewableImage(q.imageUrl) && (
                           <ImageThumb
                             key={q.imageUrl.trim()}

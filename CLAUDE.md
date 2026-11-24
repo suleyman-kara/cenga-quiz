@@ -91,7 +91,9 @@ Ayrıntılar [`docs/firebase-kurulum.md`](docs/firebase-kurulum.md) içinde. Öz
 5. Firestore: Production mode, konum `europe-west1` ya da `eur3`.
 6. Realtime Database: **Belçika (`europe-west1`)**, Locked mode. Başka bölgede
    oyuncu katılım tetikleyicileri çalışmaz.
-7. Web uygulaması ekle, `firebaseConfig` bloğunu `firebase-config.txt` dosyasına
+7. Storage: Production mode, konum `europe-west1` (quiz görselleri). Deploy'dan önce
+   açılmalı.
+8. Web uygulaması ekle, `firebaseConfig` bloğunu `firebase-config.txt` dosyasına
    kaydet. Bu dosya git'e eklenmez.
 
 ### 5. Yapılandırmayı aktar

@@ -28,6 +28,7 @@ describe("parseFirebaseConfig", () => {
       databaseURL: "https://kulup-quiz-default-rtdb.europe-west1.firebasedatabase.app",
       projectId: "kulup-quiz",
       appId: "1:1234567890:web:abcdef123456",
+      storageBucket: "kulup-quiz.firebasestorage.app",
     });
     expect(r.warnings).toEqual([]);
   });
@@ -70,6 +71,7 @@ describe("buildOutputs", () => {
     expect(out.webEnv).toContain("VITE_FIREBASE_PROJECT_ID=kulup-quiz");
     expect(out.webEnv).toContain("VITE_FIREBASE_DATABASE_URL=https://kulup-quiz-default-rtdb.europe-west1.firebasedatabase.app");
     expect(out.webEnv).toContain("VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=6Lc-site");
+    expect(out.webEnv).toContain("VITE_FIREBASE_STORAGE_BUCKET=kulup-quiz.firebasestorage.app");
     expect(out.webEnv).not.toContain("VITE_USE_EMULATORS");
     expect(out.functionsEnvFile).toBe("functions/.env.kulup-quiz");
     expect(out.functionsEnv).toContain("DATABASE_URL=https://kulup-quiz-default-rtdb.europe-west1.firebasedatabase.app");

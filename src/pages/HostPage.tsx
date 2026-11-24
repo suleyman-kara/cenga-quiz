@@ -2,8 +2,9 @@ import { useState, type ChangeEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { validateQuiz } from "../../shared/quizValidate";
 import type { Quiz } from "../../shared/types";
-import { deleteQuiz, loadQuiz, saveQuiz, useMyQuizzes, type HostUser } from "../game/host";
+import { deleteQuiz, loadQuiz, saveQuiz, useMyLiveGames, useMyQuizzes, useMyResults, type HostUser } from "../game/host";
 import { copyTitle, downloadQuiz } from "../host/quizFile";
+import { downloadResultCsv } from "../host/results";
 import { HostGate } from "../host/HostGate";
 import { Layout } from "../components/Layout";
 import { ChoiceShape } from "../components/ChoiceShape";
@@ -176,7 +177,9 @@ function Dashboard({ user, signOut }: { user: HostUser; signOut: () => Promise<v
             </ul>
           )}
         </section>
+        <LiveGames uid={user.uid} />
         <QuizImport uid={user.uid} />
+        <PastResults uid={user.uid} />
       </div>
       <ConfirmDialog
         open={!!toDelete}
@@ -289,3 +292,81 @@ function QuizImport({ uid }: { uid: string }) {
     </section>
   );
 }
+
+const when = (ms: number) =>
+  new Date(ms).toLocaleString(club.locale === "tr" ? "tr-TR" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+
+/** Games still running: a way back to the big screen after closing the tab or changing computer. */
+function LiveGames({ uid }: { uid: string }) {
+  const { games, error } = useMyLiveGames(uid);
+  if (games.length === 0 && !error) return null;
+  return (
+    <section className="card stack live-games" aria-labelledby="live-games-title">
+      <h2 id="live-games-title" className="subhead">
+        {t("host.liveGamesTitle")}
+      </h2>
+      {error && (
+        <p className="field__error" role="alert">
+          {t("common.error", { message: error })}
+        </p>
+      )}
+      <ul className="result-list">
+        {games.map((g) => (
+          <li key={g.pin} className="result-row">
+            <div className="result-row__body">
+              <p className="result-row__title">{g.title}</p>
+              <p className="muted">
+                <span className="chip">{g.pin}</span> {t("host.liveGameStarted", { time: when(g.createdAt) })}
+              </p>
+            </div>
+            <Link className="btn btn--primary btn--small" to={`/host/game/${g.pin}`}>
+              {t("host.backToGame")}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Archived games with CSV downloads (ranking, per-question stats). */
+function PastResults({ uid }: { uid: string }) {
+  const { results, error } = useMyResults(uid);
+  return (
+    <section className="card stack past-results" aria-labelledby="past-results-title">
+      <h2 id="past-results-title" className="subhead">
+        {t("host.resultsTitle")}
+      </h2>
+      {error && (
+        <p className="field__error" role="alert">
+          {t("common.error", { message: error })}
+        </p>
+      )}
+      {results.length === 0 ? (
+        <p className="muted">{t("host.noResults", { days: club.game.resultsRetentionDays })}</p>
+      ) : (
+        <ul className="result-list">
+          {results.map((r) => (
+            <li key={r.id} className="result-row">
+              <div className="result-row__body">
+                <p className="result-row__title">{r.title}</p>
+                <p className="muted">
+                  {when(r.endedAt)} · {t("host.resultPlayers", { count: r.playerCount })}
+                </p>
+              </div>
+              <div className="result-row__actions">
+                <button type="button" className="btn btn--ghost btn--small" onClick={() => downloadResultCsv(r, "siralama")}>
+                  {t("host.downloadRanking")}
+                </button>
+                <button type="button" className="btn btn--ghost btn--small" onClick={() => downloadResultCsv(r, "sorular")}>
+                  {t("host.downloadQuestions")}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+

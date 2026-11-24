@@ -23,6 +23,7 @@
  *   scores/{uid}:         PlayerScore             (Functions write; player reads own; host reads all)
  *   leaderboard:          Leaderboard             (Functions write; top N only; host + joined players read)
  *   banned/{uid}:         true                    (Functions write on kick; that uid + host read)
+ *   stats/{qIndex}:       Omit<QuestionStat,"index"> (Functions write at reveal, for the archive; nobody reads)
  *   hostOnline:           true                    (host's big screen writes while connected, removed on
  *                                                  disconnect; host + joined players read)
  * nameClaims/{pin}/…      name reservations used by the join trigger (Functions only)
@@ -85,6 +86,20 @@ export interface GameResultDoc {
   expireAt: Date | { seconds: number; nanoseconds: number; toMillis(): number };
   /** sorted by rank */
   results: { uid: string; name: string; score: number; rank: number; correctCount: number }[];
+  /** per revealed question, in order (absent in results archived before it existed) */
+  questions?: QuestionStat[];
+}
+
+/** One revealed question in a result: how the room answered it. */
+export interface QuestionStat {
+  index: number;
+  text: string;
+  /** index of the correct option */
+  correct: number;
+  /** answers per option */
+  counts: number[];
+  /** players in the room when it was revealed */
+  players: number;
 }
 
 // ---------- RTDB live game ----------

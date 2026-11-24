@@ -57,4 +57,13 @@ describe("resolveFirebaseConfig", () => {
   it("dev with a project but incomplete config also throws", () => {
     expect(() => resolveFirebaseConfig({ DEV: true, VITE_FIREBASE_PROJECT_ID: "p" })).toThrow(ConfigError);
   });
+
+  it("storage bucket: from the config, else the project's default bucket", () => {
+    expect(resolveFirebaseConfig({ ...full, VITE_FIREBASE_STORAGE_BUCKET: "b.appspot.com" }).options.storageBucket).toBe("b.appspot.com");
+    expect(resolveFirebaseConfig(full).options.storageBucket).toBe("p.firebasestorage.app");
+    expect(resolveFirebaseConfig({ ...full, DEV: true, VITE_USE_EMULATORS: "true" }).options.storageBucket).toBe(
+      `${EMULATORS.options.projectId}.appspot.com`,
+    );
+  });
 });
+

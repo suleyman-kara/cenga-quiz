@@ -6,6 +6,7 @@ import type {
   PlayerEntry,
   PlayerScore,
   PublicQuestion,
+  QuestionStat,
   Quiz,
   RevealData,
 } from "../../../shared/types";
@@ -38,6 +39,8 @@ export interface Room {
   leaderboard?: Leaderboard;
   /** kicked uids (true) — rules reject their joins */
   banned?: Record<string, true>;
+  /** per revealed question, for the archive (RTDB may hand it back as an array) */
+  stats?: Record<string, Omit<QuestionStat, "index">> | (Omit<QuestionStat, "index"> | undefined)[];
 }
 
 /** Multi-path update relative to games/{pin}; null deletes. */

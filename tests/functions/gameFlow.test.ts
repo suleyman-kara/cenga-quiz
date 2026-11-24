@@ -204,6 +204,10 @@ describe("game flow (host callables)", () => {
     expect((await adminFs().collection("gameResults").get()).size).toBe(1);
     const result = (await adminFs().doc(`gameResults/${resultId}`).get()).data() as GameResultDoc;
     expect(result).toMatchObject({ pin, hostUid: host.uid, quizId: "q1", title: "Test Yarışması", playerCount: 3, questionCount: 3 });
+    // per-question stats for the CSV export: Q0 had 2 of 3 correct
+    expect(result.questions?.map((q) => q.index)).toEqual([0, 1, 2]);
+    expect(result.questions?.[0]).toMatchObject({ correct: 1, players: 3 });
+    expect(result.questions?.[0].counts[1]).toBe(2);
     expect((result.expireAt as unknown as { toMillis(): number }).toMillis()).toBe(
       result.endedAt + club.game.resultsRetentionDays * 86_400_000,
     );

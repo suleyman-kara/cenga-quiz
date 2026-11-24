@@ -27,16 +27,7 @@ const TR_ASCII: Record<string, string> = { ç: "c", ğ: "g", ı: "i", ö: "o", �
 
 /** "Genel Kültür: Tur 1" → "genel-kultur-tur-1.json" (ASCII only; "quiz.json" when nothing is left). */
 export function quizFileName(title: string): string {
-  const slug = title
-    .toLocaleLowerCase("tr")
-    .replace(/[çğıöşüâîû]/g, (c) => TR_ASCII[c] ?? c)
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60)
-    .replace(/-+$/, "");
-  return `${slug || "quiz"}.json`;
+  return `${slug(title) || "quiz"}.json`;
 }
 
 /** Title for a copy: "<title><suffix>", shortening the title so the result fits the limit. */
@@ -47,11 +38,29 @@ export function copyTitle(title: string, suffix: string): string {
 
 /** Starts a browser download of the quiz as a .json file. */
 export function downloadQuiz(quiz: Quiz): void {
-  const blob = new Blob([quizToJson(quiz)], { type: "application/json;charset=utf-8" });
+  downloadText(quizFileName(quiz.title), quizToJson(quiz), "application/json;charset=utf-8");
+}
+
+/** ASCII slug for file names ("Genel Kültür: Tur 1" → "genel-kultur-tur-1"); "" when nothing is left. */
+export function slug(title: string): string {
+  return title
+    .toLocaleLowerCase("tr")
+    .replace(/[çğıöşüâîû]/g, (c) => TR_ASCII[c] ?? c)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+}
+
+/** Starts a browser download of `text` as a file. */
+export function downloadText(fileName: string, text: string, type: string): void {
+  const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = quizFileName(quiz.title);
+  a.download = fileName;
   a.rel = "noopener";
   a.style.display = "none";
   document.body.appendChild(a);

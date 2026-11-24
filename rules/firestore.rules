@@ -51,7 +51,11 @@ service cloud.firestore {
         && validQuiz(request.resource.data);
     }
 
-    // liveGames/{pin}: Cloud Functions only (no rule => denied).
+    // liveGames/{pin}: written by Cloud Functions only. The host reads their own open games (to
+    // return to one from the panel); the snapshot holds their own quiz, answers included.
+    match /liveGames/{pin} {
+      allow get, list: if signedIn() && resource.data.hostUid == request.auth.uid;
+    }
 
     match /gameResults/{id} {
       allow read: if signedIn() && resource.data.hostUid == request.auth.uid;

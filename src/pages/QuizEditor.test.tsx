@@ -6,8 +6,13 @@ import { translate } from "../i18n";
 import { club } from "../club.config";
 import { QuizEditor } from "./QuizEditor";
 import { useHostAuth, loadQuiz, saveQuiz, updateQuiz } from "../game/host";
+import { uploadQuizImage } from "../host/imageUpload";
 
 vi.mock("../firebase", () => ({ hostCall: vi.fn() }));
+vi.mock("../host/imageUpload", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../host/imageUpload")>()),
+  uploadQuizImage: vi.fn(),
+}));
 vi.mock("../game/host", () => ({
   useHostAuth: vi.fn(),
   loadQuiz: vi.fn(),
@@ -298,4 +303,36 @@ Cevap: b`;
       }
     });
   });
+
+  describe("image upload", () => {
+    const pick = (input: HTMLElement, file: File) => fireEvent.change(input, { target: { files: [file] } });
+
+    it("uploads a picked image and puts its address into the question", async () => {
+      vi.mocked(uploadQuizImage).mockResolvedValue("https://storage.example/quizImages/h1/x.webp");
+      renderEditor("yeni");
+      const input = within(q1()).getByLabelText(t("editor.imageUpload"));
+      pick(input, new File([new Uint8Array(10)], "kedi.png", { type: "image/png" }));
+      await waitFor(() =>
+        expect(within(q1()).getByLabelText(t("editor.image"))).toHaveValue("https://storage.example/quizImages/h1/x.webp"),
+      );
+      expect(uploadQuizImage).toHaveBeenCalledWith("h1", expect.any(File));
+    });
+
+    it("refuses an unsupported file before uploading, with a message", async () => {
+      vi.mocked(uploadQuizImage).mockReset();
+      renderEditor("yeni");
+      pick(within(q1()).getByLabelText(t("editor.imageUpload")), new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }));
+      expect(await within(q1()).findByText(t("editor.imageBadType"))).toBeInTheDocument();
+      expect(uploadQuizImage).not.toHaveBeenCalled();
+    });
+
+    it("an upload error is shown and the address stays as it was", async () => {
+      vi.mocked(uploadQuizImage).mockRejectedValue(new Error("network"));
+      renderEditor("yeni");
+      pick(within(q1()).getByLabelText(t("editor.imageUpload")), new File([new Uint8Array(10)], "a.jpg", { type: "image/jpeg" }));
+      expect(await within(q1()).findByText(t("editor.imageUploadFailed"))).toBeInTheDocument();
+      expect(within(q1()).getByLabelText(t("editor.image"))).toHaveValue("");
+    });
+  });
 });
+

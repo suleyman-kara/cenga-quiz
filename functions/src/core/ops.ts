@@ -108,6 +108,8 @@ export function planReveal(room: Room | null | undefined, ctx: OpContext): Patch
   return {
     ...purgeInactivePlayers(r),
     reveal: { qIndex, correct: q.correct, counts: result.counts },
+    // a few bytes per question, so the archive can say which questions were hard
+    [`stats/${qIndex}`]: { text: q.text, correct: q.correct, counts: result.counts, players: Object.keys(activePlayers(r)).length },
     scores: result.scores,
     leaderboard: result.leaderboard,
     state: idleState("reveal", qIndex, ctx.now),

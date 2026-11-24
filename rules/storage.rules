@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Cloud Storage: quiz images uploaded from the host panel's quiz editor.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /quizImages/{uid}/{file} {
+      // Shown on the big screen and the phones; file names are random.
+      allow read: if true;
+
+      // A host (verified e-mail on the allow-list, same check as the Firestore rules) uploads into
+      // their own folder: one new image of at most 2 MB, PNG / JPEG / WebP / GIF (no SVG: it can
+      // carry scripts). Never overwritten, so an older quiz keeps its picture.
+      allow create: if resource == null
+        && request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && request.auth.token.email_verified == true
+        && firestore.exists(/databases/(default)/documents/allowedHosts/$(request.auth.token.email.lower()))
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(png|jpeg|webp|gif)');
+
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

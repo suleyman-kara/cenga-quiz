@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { get } from "firebase/database";
-import { checkGame, fetchOwnAnswer } from "./actions";
+import { get, remove } from "firebase/database";
+import { checkGame, fetchOwnAnswer, leaveLobby } from "./actions";
 
 vi.mock("../firebase", () => ({
   auth: { authStateReady: () => Promise.resolve(), currentUser: { uid: "u1" } },
@@ -11,6 +11,7 @@ vi.mock("firebase/database", () => ({
   ref: vi.fn((_db: unknown, path: string) => ({ path })),
   get: vi.fn(),
   set: vi.fn(),
+  remove: vi.fn(async () => {}),
   serverTimestamp: () => ({ ".sv": "timestamp" }),
 }));
 
@@ -90,3 +91,11 @@ describe("fetchOwnAnswer", () => {
     expect(await fetchOwnAnswer("123456", 2)).toBeNull();
   });
 });
+
+describe("leaveLobby", () => {
+  it("removes only the player's own entry (the rules allow it in the lobby)", async () => {
+    await leaveLobby("123456");
+    expect(remove).toHaveBeenCalledWith({ path: `${P}/players/u1` });
+  });
+});
+

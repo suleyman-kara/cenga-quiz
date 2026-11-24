@@ -8,6 +8,8 @@ export interface ClientEnv {
   VITE_FIREBASE_PROJECT_ID?: string;
   VITE_FIREBASE_DATABASE_URL?: string;
   VITE_FIREBASE_APP_ID?: string;
+  /** optional: older configs lack it; defaults to the project's default bucket */
+  VITE_FIREBASE_STORAGE_BUCKET?: string;
   VITE_USE_EMULATORS?: string;
 }
 
@@ -17,7 +19,7 @@ export const DEMO_PROJECT = "demo-club-quiz";
 export interface EmulatorSetup {
   options: FirebaseOptions;
   host: string;
-  ports: { auth: number; database: number; functions: number; firestore: number };
+  ports: { auth: number; database: number; functions: number; firestore: number; storage: number };
 }
 
 export const EMULATORS: EmulatorSetup = {
@@ -27,9 +29,10 @@ export const EMULATORS: EmulatorSetup = {
     authDomain: `${DEMO_PROJECT}.firebaseapp.com`,
     databaseURL: `http://127.0.0.1:9000?ns=${DEMO_PROJECT}-default-rtdb`,
     appId: "demo-app",
+    storageBucket: `${DEMO_PROJECT}.appspot.com`,
   },
   host: "127.0.0.1",
-  ports: { auth: 9099, database: 9000, functions: 5001, firestore: 8080 },
+  ports: { auth: 9099, database: 9000, functions: 5001, firestore: 8080, storage: 9199 },
 };
 
 const REQUIRED = [
@@ -73,6 +76,7 @@ export function resolveFirebaseConfig(env: ClientEnv, emulators?: EmulatorSetup)
       projectId: env.VITE_FIREBASE_PROJECT_ID,
       databaseURL: env.VITE_FIREBASE_DATABASE_URL,
       appId: env.VITE_FIREBASE_APP_ID,
+      storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET?.trim() || `${env.VITE_FIREBASE_PROJECT_ID}.firebasestorage.app`,
     },
   };
 }
