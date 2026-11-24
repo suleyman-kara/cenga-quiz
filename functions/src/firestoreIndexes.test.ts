@@ -17,6 +17,14 @@ describe("firestore.indexes.json", () => {
       indexes: [],
     });
   });
+  it("declares the TTL policy on rateLimits.expireAt (old counters delete themselves)", () => {
+    expect(spec.fieldOverrides).toContainEqual({
+      collectionGroup: "rateLimits",
+      fieldPath: "expireAt",
+      ttl: true,
+      indexes: [],
+    });
+  });
   it("is the indexes file firebase.json deploys", () => {
     expect(cfg.firestore.indexes).toBe("rules/firestore.indexes.json");
   });

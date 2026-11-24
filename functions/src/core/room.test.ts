@@ -44,11 +44,11 @@ describe("newRoom", () => {
 describe("publicQuestion", () => {
   it("never contains the correct index and uses effective seconds", () => {
     const pq = publicQuestion(quiz, 1, 20);
-    expect(pq).toEqual({ index: 1, text: "S2", options: ["evet", "hayır"], seconds: 20, imageUrl: "https://example.com/x.png" });
+    expect(pq).toEqual({ index: 1, text: "S2", optionCount: 2, seconds: 20, imageUrl: "https://example.com/x.png" });
     expect(JSON.stringify(pq)).not.toContain("correct");
   });
   it("omits imageUrl when absent", () => {
-    expect(publicQuestion(quiz, 0, 20)).toEqual({ index: 0, text: "S1", options: ["a", "b", "c", "d"], seconds: 10 });
+    expect(publicQuestion(quiz, 0, 20)).toEqual({ index: 0, text: "S1", optionCount: 4, seconds: 10 });
   });
   it("double: true only for the last N questions (clamped to half the quiz); omitted otherwise", () => {
     expect(publicQuestion(quiz, 1, 20, 3)).toMatchObject({ index: 1, double: true });
@@ -59,10 +59,16 @@ describe("publicQuestion", () => {
 });
 
 describe("questionPatch", () => {
-  it("writes question, clears reveal and sets timed state in one patch", () => {
+  it("never puts the options in the question node: they go to options/{index} (readable once answering opens)", () => {
+    const pq = publicQuestion(quiz, 0, 20);
+    expect("options" in pq).toBe(false);
+    expect(questionPatch(quiz, 0, 10_000, 20, 3000)["options/0"]).toEqual(["a", "b", "c", "d"]);
+  });
+  it("writes question, options, clears reveal and sets timed state in one patch", () => {
     const p = questionPatch(quiz, 0, 10_000, 20);
     expect(p).toEqual({
-      question: { index: 0, text: "S1", options: ["a", "b", "c", "d"], seconds: 10 },
+      question: { index: 0, text: "S1", optionCount: 4, seconds: 10 },
+      "options/0": ["a", "b", "c", "d"],
       reveal: null,
       state: { phase: "question", qIndex: 0, startedAt: 10_000, endsAt: 20_000, updatedAt: 10_000 },
     });

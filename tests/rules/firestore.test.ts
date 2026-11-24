@@ -226,3 +226,13 @@ describe("Firestore: everything else denied", () => {
     await assertFails(setDoc(doc(hostDb(), "quizzes", "q1", "sub", "x"), { a: 1 }));
   });
 });
+
+describe("Firestore: rateLimits (server only)", () => {
+  it("nobody reads or writes the rate limit counters from a client", async () => {
+    for (const db of [hostDb(), anonDb(), unauthDb()]) {
+      await assertFails(getDoc(doc(db, "rateLimits", "x")));
+      await assertFails(setDoc(doc(db, "rateLimits", "x"), { count: 0 }));
+    }
+  });
+});
+

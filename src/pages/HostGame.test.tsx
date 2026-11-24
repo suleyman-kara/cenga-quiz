@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import type { GameState, PublicQuestion } from "../../shared/types";
+import type { GameState, ShownQuestion } from "../../shared/types";
 import { translate } from "../i18n";
 import { club } from "../club.config";
 import { HostGame } from "./HostGame";
@@ -38,12 +38,13 @@ vi.mock("../game/hooks", () => ({
   usePlayers: vi.fn(),
   useAnswerUids: vi.fn(),
   useServerNow: vi.fn(),
+  useQuestionOptions: vi.fn(),
 }));
 
 const t = (k: Parameters<typeof translate>[1], v?: Record<string, string | number>) => translate(club.locale, k, v);
 
 const qState = (qIndex = 0): GameState => ({ phase: "question", qIndex, startedAt: 0, endsAt: 20_000, updatedAt: 0 });
-const question = (index = 0): PublicQuestion => ({ index, text: "Başkent?", options: ["İzmir", "Ankara"], seconds: 20 });
+const question = (index = 0): ShownQuestion => ({ index, text: "Başkent?", optionCount: 2, options: ["İzmir", "Ankara"], seconds: 20 });
 const players = (n: number) => Array.from({ length: n }, (_, i) => ({ uid: `u${i}`, name: `Oyuncu ${i}`, joinedAt: i }));
 const meta = (p: Partial<{ locked: boolean }> = {}) => ({
   hostUid: "h1",
@@ -76,6 +77,7 @@ describe("HostGame", () => {
     vi.mocked(hooks.usePlayers).mockReturnValue(players(2));
     vi.mocked(hooks.useAnswerUids).mockReturnValue([]);
     vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
+    vi.mocked(hooks.useQuestionOptions).mockImplementation(() => ["İzmir", "Ankara"]);
   });
 
   it("lobby: shows the PIN, join URL, player names and count; Start calls the host dispatcher", async () => {
@@ -203,7 +205,9 @@ describe("HostGame", () => {
     renderHost();
     const kick = screen.getByRole("button", { name: t("hostGame.kick", { name: "Oyuncu 1" }) });
     await userEvent.click(kick);
-    const dialog = screen.getByRole("alertdialog", { name: t("hostGame.kickConfirm", { name: "Oyuncu 1" }) });
+    const dialog = screen.getByRole("alertdialog", {
+      name: `${t("hostGame.kickConfirm", { name: "Oyuncu 1" })} ${t("hostGame.kickLocksLobby")}`,
+    });
     await userEvent.click(within(dialog).getByRole("button", { name: t("common.cancel") }));
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(callsOf("kickPlayer")).toHaveLength(0);
@@ -753,6 +757,13 @@ describe("HostGame", () => {
     vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "ended" });
     renderHost();
     expect(useHostPresence).toHaveBeenLastCalledWith("123456", false);
+  });
+
+  it("the host reads the options right away (the stage still hides them during the lead-in)", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(qState(1));
+    vi.mocked(hooks.useQuestion).mockReturnValue(question(1));
+    renderHost();
+    expect(hooks.useQuestionOptions).toHaveBeenLastCalledWith("123456", 1, null);
   });
 });
 

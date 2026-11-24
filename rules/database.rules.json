@@ -9,6 +9,11 @@
         "question": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
         "reveal": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
         "leaderboard": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
+        "options": {
+          "$qIndex": {
+            ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || (root.child('games/' + $pin + '/players/' + auth.uid).exists() && root.child('games/' + $pin + '/state/qIndex').val() + '' === $qIndex && now >= root.child('games/' + $pin + '/state/startedAt').val()))"
+          }
+        },
         "hostOnline": {
           ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())",
           ".write": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
@@ -38,7 +43,7 @@
               ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('games/' + $pin + '/players/' + $uid).exists() && !root.child('games/' + $pin + '/banned/' + $uid).exists() && root.child('games/' + $pin + '/state/phase').val() === 'question' && (!root.child('games/' + $pin + '/state/lock').exists() || root.child('games/' + $pin + '/state/lock/at').val() < now - 30000) && root.child('games/' + $pin + '/state/qIndex').isNumber() && root.child('games/' + $pin + '/state/qIndex').val() + '' === $qIndex && now >= root.child('games/' + $pin + '/state/startedAt').val() && now < root.child('games/' + $pin + '/state/endsAt').val()",
               ".validate": "newData.hasChildren(['choice', 'at'])",
               "choice": {
-                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() % 1 === 0 && root.child('games/' + $pin + '/question/options/' + newData.val()).exists()"
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() % 1 === 0 && newData.val() < root.child('games/' + $pin + '/question/optionCount').val()"
               },
               "at": { ".validate": "newData.isNumber() && newData.val() === now" },
               "$other": { ".validate": false }

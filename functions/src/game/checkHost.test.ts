@@ -49,3 +49,19 @@ describe("createCheckHostEmail", () => {
     expect(await check({ email: "a@b.co" })).toEqual({ allowed: true });
   });
 });
+
+describe("createCheckHostEmail rate limit", () => {
+  it("asks the limiter first; when it refuses, answers resource-exhausted without looking anything up", async () => {
+    const lookup = vi.fn(async () => true);
+    const limiter = vi.fn(async () => false);
+    const check = createCheckHostEmail(lookup, limiter);
+    await expect(check({ email: "host@example.org" }, "203.0.113.9")).rejects.toMatchObject({ code: "resource-exhausted" });
+    expect(lookup).not.toHaveBeenCalled();
+    expect(limiter).toHaveBeenCalledWith("203.0.113.9");
+  });
+  it("an allowed call goes through", async () => {
+    const check = createCheckHostEmail(async () => true, async () => true);
+    expect(await check({ email: "host@example.org" }, "203.0.113.9")).toEqual({ allowed: true });
+  });
+});
+

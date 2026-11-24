@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import type { GameState, Leaderboard, PlayerScore, PublicQuestion, RevealData } from "../../shared/types";
+import type { GameState, Leaderboard, PlayerScore, RevealData, ShownQuestion } from "../../shared/types";
 import {
   useBanned,
   useGameState,
@@ -10,6 +10,7 @@ import {
   useMyScore,
   usePlayerUid,
   useQuestion,
+  useQuestionOptions,
   useReveal,
   useServerNow,
 } from "../game/hooks";
@@ -17,6 +18,7 @@ import { fetchOwnAnswer, submitAnswer } from "../game/actions";
 import { useConnectionLost } from "../game/connection";
 import { answeredChoice, clearSession, finishSession, loadSession, markAnswered } from "../game/session";
 import { useWakeLock } from "../host/useWakeLock";
+import { shownQuestion } from "../game/question";
 import { isPermissionDenied } from "../errors";
 import { Layout } from "../components/Layout";
 import { ChoiceButton } from "../components/ChoiceButton";
@@ -41,7 +43,11 @@ export function PlayerGame() {
   const session = loadSession(pin);
   const uid = usePlayerUid();
   const state = useGameState(pin);
-  const question = useQuestion(pin);
+  const questionNode = useQuestion(pin);
+  // options become readable at startedAt (rules): until then the phone shows only the text
+  const current = !!state && questionNode?.index === state.qIndex;
+  const options = useQuestionOptions(pin, questionNode?.index ?? -1, current ? state!.startedAt : null);
+  const question = shownQuestion(questionNode, current ? options : undefined);
   const reveal = useReveal(pin);
   const leaderboard = useLeaderboard(pin);
   const score = useMyScore(pin, uid);
@@ -225,7 +231,7 @@ function QuestionView({
 }: {
   pin: string;
   state: GameState;
-  question: PublicQuestion | null;
+  question: ShownQuestion | null;
   now: number;
   /** realtime connection dropped: writes are queued by the SDK and sent on reconnect */
   lost: boolean;
@@ -293,7 +299,7 @@ function QuestionView({
     }
   };
   const choose = (i: number) => {
-    if (busy || timeUp || leadIn) return;
+    if (busy || timeUp || leadIn || question.options.length < question.optionCount) return;
     setSub({ kind: "sending", choice: i });
     navigator.vibrate?.(30);
     let settled = false;
@@ -339,7 +345,9 @@ function QuestionView({
     );
   };
 
-  const locked = busy || timeUp || leadIn;
+  // answering opened but the options are still on their way (a few ms): shapes only, not tappable
+  const loading = question.options.length < question.optionCount;
+  const locked = busy || timeUp || leadIn || loading;
   const picked = sub.kind === "sending" || sub.kind === "sent" ? sub.choice : null;
   const secs = remainingSeconds(state.endsAt, now);
   return (
@@ -405,8 +413,8 @@ function QuestionView({
       )}
       {/* options appear only once answering opens (not during the "get ready" lead-in) */}
       {!leadIn && (
-        <div className="choice-grid choice-grid--in" data-count={question.options.length} data-locked={locked || undefined}>
-          {question.options.map((opt, i) => (
+        <div className="choice-grid choice-grid--in" data-count={question.optionCount} data-locked={locked || undefined}>
+          {Array.from({ length: question.optionCount }, (_, i) => question.options[i] ?? "").map((opt, i) => (
             <ChoiceButton
               key={`${attempt}-${i}`}
               index={i}
@@ -453,7 +461,7 @@ function RevealView({
 }: {
   score: PlayerScore | null | undefined;
   reveal: RevealData | null | undefined;
-  question: PublicQuestion | null | undefined;
+  question: ShownQuestion | null | undefined;
 }) {
   useVerdictBuzz(!score?.lastAnswered ? "noAnswer" : score.lastCorrect ? "correct" : "wrong", reveal?.qIndex);
   if (!score) return <Loading variant="text" />;

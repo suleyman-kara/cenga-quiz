@@ -3,11 +3,11 @@
  * `null` when the node does not exist.
  *
  * TRAFFIC RULE: player screens use only useGameState, useQuestion, useReveal,
- * useLeaderboard, useMyScore, useMyPlayer, useBanned, useHostOnline (+ useMeta) — all single small nodes. usePlayers / useAnswerUids are
+ * useLeaderboard, useMyScore, useMyPlayer, useBanned, useHostOnline, useQuestionOptions (+ useMeta) — all single small nodes. usePlayers / useAnswerUids are
  * host-only — they subscribe to lists that grow with the audience.
  */
-import { useEffect, useState } from "react";
-import { onValue, ref } from "firebase/database";
+import { useEffect, useRef, useState } from "react";
+import { get, onValue, ref } from "firebase/database";
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import type {
   GameMeta,
@@ -85,6 +85,50 @@ export const useMyPlayer = (pin: string, uid: string | null) =>
   useRtdbValue<PlayerEntry>(uid ? paths.player(pin, uid) : null);
 /** true once the host kicked this player (banned/{uid} is readable by that uid). */
 export const useBanned = (pin: string, uid: string | null) => useRtdbValue<true>(uid ? paths.banned(pin, uid) : null);
+
+/** How often / how long a player retries reading the options right after they open (clock skew). */
+export const OPTIONS_RETRY_MS = 250;
+export const OPTIONS_MAX_TRIES = 40;
+
+/**
+ * Options of question `qIndex` (games/{pin}/options/{qIndex}). Players may read them only once
+ * answering opened (rules: now >= state.startedAt), so the read is a one-shot get() timed for
+ * `openAt` on the server clock and retried briefly; the host passes `openAt = null` (no wait).
+ * undefined until read.
+ */
+export function useQuestionOptions(pin: string, qIndex: number, openAt: number | null): string[] | undefined {
+  const uid = useAuthUid();
+  const offset = useRtdbValue<number>(".info/serverTimeOffset") ?? 0;
+  const offsetRef = useRef(offset);
+  offsetRef.current = offset;
+  const key = uid && qIndex >= 0 ? `${uid}|${pin}|${qIndex}|${openAt ?? "now"}` : null;
+  const [value, setValue] = useState<{ key: string | null; v: string[] | undefined }>({ key, v: undefined });
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const attempt = (n: number) => {
+      get(ref(db, paths.options(pin, qIndex))).then(
+        (snap) => {
+          if (cancelled) return;
+          if (snap.exists()) setValue({ key, v: snap.val() as string[] });
+          else if (n < OPTIONS_MAX_TRIES) timer = setTimeout(() => attempt(n + 1), OPTIONS_RETRY_MS);
+        },
+        () => {
+          // permission denied a few ms early (clocks differ slightly): try again
+          if (!cancelled && n < OPTIONS_MAX_TRIES) timer = setTimeout(() => attempt(n + 1), OPTIONS_RETRY_MS);
+        },
+      );
+    };
+    const wait = openAt === null ? 0 : Math.max(0, openAt - (Date.now() + offsetRef.current));
+    timer = setTimeout(() => attempt(0), wait);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [key, pin, qIndex, openAt]);
+  return value.key === key ? value.v : undefined;
+}
 
 /** true while the host's big screen is connected (set by useHostPresence); null when it is not. */
 export const useHostOnline = (pin: string) => useRtdbValue<true>(paths.hostOnline(pin));

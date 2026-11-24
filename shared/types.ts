@@ -6,7 +6,11 @@
  * games/{pin}/
  *   meta:                 GameMeta                (Functions write; any signed-in user reads)
  *   state:                GameState               (Functions write; any signed-in user reads)
- *   question:             PublicQuestion          (Functions write; NO correct answer; host + joined players read)
+ *   question:             PublicQuestion          (Functions write; NO correct answer, NO options; host + joined
+ *                                                  players read)
+ *   options/{qIndex}:     string[]                (Functions write with the question; host reads; a joined player
+ *                                                  reads the current question's once now >= state.startedAt, so a
+ *                                                  script cannot read them during the "Hazır olun" lead-in)
  *   reveal:               RevealData              (Functions write; host + joined players read)
  *   players/{uid}:        PlayerEntry             (player creates own once / deletes own, only in an unlocked,
  *                                                  not-full lobby and while state.lock is absent; never renamed
@@ -140,11 +144,17 @@ export interface GameState {
 export interface PublicQuestion {
   index: number;
   text: string;
-  options: string[];
+  /** the options themselves are in options/{index}, readable by players only once answering opens */
+  optionCount: number;
   seconds: number;
   imageUrl?: string;
   /** one of the last club.game.doublePointsLastN questions: points × 2 (absent otherwise) */
   double?: true;
+}
+
+/** Client view of a question: the question node plus its options (empty until they are readable). */
+export interface ShownQuestion extends PublicQuestion {
+  options: string[];
 }
 
 export interface RevealData {

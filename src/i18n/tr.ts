@@ -211,6 +211,7 @@ export const tr: Messages = {
   "player.getReady": "Hazır ol",
   "hostGame.kick": "{name} adlı oyuncuyu çıkar",
   "hostGame.kickConfirm": "{name} oyundan çıkarılsın mı? Bu cihaz oyuna geri giremez.",
+  "hostGame.kickLocksLobby": "Lobi de kilitlenir; yeni oyuncu alacaksanız kilidi açın.",
   "hostGame.kickConfirmOk": "Çıkar",
   "hostGame.kickManyConfirm": "{count} oyuncu oyundan çıkarılsın mı? Bu cihazlar oyuna geri giremez.",
   "hostGame.kickSelected": "Seçilenleri çıkar ({count})",

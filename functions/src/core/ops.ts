@@ -143,6 +143,9 @@ export function planKick(room: Room | null | undefined, ctx: OpContext, target: 
 export function planKickMany(room: Room | null | undefined, ctx: OpContext, targets: readonly string[]): Patch {
   const r = guard(room, ctx, "kick");
   const patch: Patch = { "meta/lastActivityAt": ctx.now };
+  // A ban is per (anonymous) uid: a kicked player could sign in again and rejoin. Kicking in the
+  // lobby therefore closes it; the host reopens it with one click if needed.
+  if (r.state.phase === "lobby") patch["meta/locked"] = true;
   for (const t of targets) Object.assign(patch, { [`players/${t}`]: null, [`scores/${t}`]: null, [`banned/${t}`]: true });
   if (r.leaderboard) {
     // Keep the big screen clean: rebuild the leaderboard (and ranks) without the kicked players.

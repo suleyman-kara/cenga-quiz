@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { GameMeta, GameState, HostActionMap, PublicQuestion, RevealData } from "../../shared/types";
+import type { GameMeta, GameState, HostActionMap, RevealData, ShownQuestion } from "../../shared/types";
 import {
   useAnswerUids,
   useGameState,
@@ -8,6 +8,7 @@ import {
   useMeta,
   usePlayers,
   useQuestion,
+  useQuestionOptions,
   useReveal,
   useServerNow,
 } from "../game/hooks";
@@ -18,6 +19,7 @@ import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../
 import { useWakeLock } from "../host/useWakeLock";
 import { useStageShortcuts } from "../host/shortcuts";
 import { useHostPresence } from "../game/presence";
+import { shownQuestion } from "../game/question";
 import { useStageSounds } from "../host/useStageSounds";
 import { SoundLevelsControl, SoundOffBanner } from "../host/StageSoundControls";
 import { withRetry } from "../host/retry";
@@ -52,7 +54,9 @@ const LOCK_STALE_MS = 30_000;
 function BigScreen({ pin }: { pin: string }) {
   const meta = useMeta(pin);
   const state = useGameState(pin);
-  const question = useQuestion(pin);
+  const questionNode = useQuestion(pin);
+  // the host may read the options at once; the stage still shows them only when answering opens
+  const question = shownQuestion(questionNode, useQuestionOptions(pin, questionNode?.index ?? -1, null));
   const reveal = useReveal(pin);
   const leaderboard = useLeaderboard(pin);
   const players = usePlayers(pin);
@@ -370,9 +374,11 @@ function BigScreen({ pin }: { pin: string }) {
         message={
           !kickTarget
             ? ""
-            : "one" in kickTarget
-              ? t("hostGame.kickConfirm", { name: kickTarget.one.label })
-              : t("hostGame.kickManyConfirm", { count: kickTarget.many.length })
+            : ("one" in kickTarget
+                ? t("hostGame.kickConfirm", { name: kickTarget.one.label })
+                : t("hostGame.kickManyConfirm", { count: kickTarget.many.length })) +
+              // the server locks the lobby with a kick (a new anonymous account could rejoin)
+              (state?.phase === "lobby" ? ` ${t("hostGame.kickLocksLobby")}` : "")
         }
         confirmLabel={t("hostGame.kickConfirmOk")}
         cancelLabel={t("common.cancel")}
@@ -607,7 +613,7 @@ function QuestionStage({
 }: {
   state: GameState;
   meta: GameMeta | null | undefined;
-  question: PublicQuestion | null;
+  question: ShownQuestion | null;
   now: number;
   answered: number;
   total: number;
@@ -662,7 +668,7 @@ function RevealStage({
 }: {
   state: GameState;
   meta: GameMeta | null | undefined;
-  question: PublicQuestion | null;
+  question: ShownQuestion | null;
   reveal: RevealData | null;
 }) {
   if (!question || !reveal) return <Loading />;

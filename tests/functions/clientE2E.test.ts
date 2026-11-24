@@ -61,15 +61,17 @@ describe("client SDK end-to-end", () => {
       const s = await waitFor<GameState>(p, `games/${pin}/state`, (v) => v.phase === "question");
       expect(s.qIndex).toBe(0);
       const q = (await get(ref(p.db, `games/${pin}/question`))).val() as PublicQuestion;
-      expect(q.options).toHaveLength(4);
-      expect(JSON.stringify(q)).not.toMatch(/correct/);
-      // answers are accepted only once the lead-in is over
+      expect(q.optionCount).toBe(4);
+      expect(JSON.stringify(q)).not.toMatch(/correct|options/);
+      // answers, and the options themselves, are available only once the lead-in is over
       if (i === 0) {
         await expect(
           set(ref(p.db, `games/${pin}/answers/0/${p.uid}`), { choice: 1, at: serverTimestamp() }),
         ).rejects.toThrow();
+        await expect(get(ref(p.db, `games/${pin}/options/0`))).rejects.toThrow();
         await new Promise((r) => setTimeout(r, Math.max(0, s.startedAt - Date.now()) + 300));
       }
+      expect((await get(ref(p.db, `games/${pin}/options/0`))).val()).toHaveLength(4);
       // Ali and Banu correct (1), Cem wrong (0)
       await set(ref(p.db, `games/${pin}/answers/0/${p.uid}`), { choice: i < 2 ? 1 : 0, at: serverTimestamp() });
       await new Promise((r) => setTimeout(r, 150));

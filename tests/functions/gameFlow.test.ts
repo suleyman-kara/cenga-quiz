@@ -64,8 +64,10 @@ describe("game flow (host callables)", () => {
     expect(s.startedAt - s.updatedAt).toBe(club.game.leadInMs);
     expect(Math.abs(s.updatedAt - before)).toBeLessThan(10_000);
     const q = await readRoom<PublicQuestion>(pin, "question");
-    expect(q).toEqual({ index: 0, text: "Birinci soru", options: ["A", "B", "C", "D"], seconds: 5 });
+    expect(q).toEqual({ index: 0, text: "Birinci soru", optionCount: 4, seconds: 5 });
     expect(JSON.stringify(q)).not.toMatch(/correct/);
+    // the options are in their own node (players may read it only from startedAt on)
+    expect(await readRoom(pin, "options/0")).toEqual(["A", "B", "C", "D"]);
     expect(await expectCode(host.call("startGame", { pin }))).toBe("functions/failed-precondition");
   });
 
