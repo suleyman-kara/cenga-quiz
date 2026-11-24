@@ -8,7 +8,7 @@ import { club } from "../club.config";
 import { PlayerGame } from "./PlayerGame";
 import * as hooks from "../game/hooks";
 import { fetchOwnAnswer, submitAnswer } from "../game/actions";
-import { saveSession } from "../game/session";
+import { loadLastSession, loadSession, saveSession } from "../game/session";
 
 vi.mock("../firebase", () => ({ call: vi.fn() }));
 vi.mock("../game/actions", () => ({ checkGame: vi.fn(), joinGame: vi.fn(), submitAnswer: vi.fn(), fetchOwnAnswer: vi.fn() }));
@@ -26,7 +26,8 @@ vi.mock("../game/hooks", () => ({
   useMyPlayer: vi.fn(),
   useBanned: vi.fn(),
 }));
-vi.mock("../game/connection", () => ({ useConnectionLost: () => false }));
+const conn = vi.hoisted(() => ({ lost: false }));
+vi.mock("../game/connection", () => ({ useConnectionLost: () => conn.lost }));
 
 const t = (k: Parameters<typeof translate>[1], v?: Record<string, string | number>) => translate(club.locale, k, v);
 
@@ -76,6 +77,7 @@ describe("PlayerGame", () => {
     vi.mocked(hooks.useServerNow).mockReturnValue(5_000);
     vi.mocked(submitAnswer).mockReset().mockResolvedValue(undefined);
     vi.mocked(fetchOwnAnswer).mockReset().mockResolvedValue(null);
+    conn.lost = false;
   });
 
   it("sends players without a session for this PIN back to the join screen", async () => {
@@ -345,7 +347,7 @@ describe("PlayerGame", () => {
     vi.mocked(hooks.useServerNow).mockReturnValue(12_000); // 9 s left
     renderPlay();
     const live = document.querySelector('[aria-live="polite"][data-countdown-announcer]');
-    expect(live).toHaveTextContent(t("hostGame.secondsLeft", { seconds: 10 }));
+    expect(live).toHaveTextContent(t("player.secondsLeft", { seconds: 10 }));
   });
 
   it("shows a 'calculating' hint while the server holds the transition lock", () => {
@@ -515,4 +517,100 @@ describe("PlayerGame", () => {
     renderPlay();
     expect(document.querySelector(".double-edge")).toBeNull();
   });
+
+  describe("keeps the phone awake", () => {
+    afterEach(() => {
+      delete (navigator as unknown as { wakeLock?: unknown }).wakeLock;
+    });
+    const fake = () => {
+      const request = vi.fn(async () => ({ release: vi.fn(async () => {}), addEventListener: vi.fn() }));
+      Object.defineProperty(navigator, "wakeLock", { value: { request }, configurable: true });
+      return request;
+    };
+
+    it("requests a screen wake lock while the game runs", async () => {
+      const request = fake();
+      renderPlay();
+      await act(async () => {});
+      expect(request).toHaveBeenCalledWith("screen");
+    });
+
+    it("does not hold the screen awake once the game ended", async () => {
+      const request = fake();
+      vi.mocked(hooks.useGameState).mockReturnValue(state("ended"));
+      renderPlay();
+      await act(async () => {});
+      expect(request).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("finished games do not capture the join screen", () => {
+    it("ended: a new visit to the join screen is not redirected here any more", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("ended"));
+      renderPlay();
+      expect(loadLastSession()).toBeNull();
+      expect(loadSession("123456")).not.toBeNull();
+    });
+
+    it("game gone: same", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(null);
+      renderPlay();
+      expect(loadLastSession()).toBeNull();
+    });
+
+    it("a running game stays the one to return to", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      renderPlay();
+      expect(loadLastSession()?.pin).toBe("123456");
+    });
+  });
+
+  describe("connection lost while answering", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("question: says the answer will be sent when the connection is back", () => {
+      conn.lost = true;
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      renderPlay();
+      expect(screen.getByText(t("player.offlineAnswerHint"))).toBeInTheDocument();
+    });
+
+    it("a tap while offline waits for the connection instead of failing after 8 s", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      conn.lost = true;
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      let resolve!: () => void;
+      vi.mocked(submitAnswer).mockReturnValue(new Promise<void>((r) => (resolve = r)));
+      const view = renderPlay();
+      await act(async () => {});
+      vi.mocked(fetchOwnAnswer).mockClear();
+      await userEvent.click(screen.getByRole("button", { name: /Ankara/ }));
+      expect(screen.getByText(t("player.sendingOffline"))).toBeInTheDocument();
+      await act(async () => void (await vi.advanceTimersByTimeAsync(12_000)));
+      expect(screen.queryByText(t("player.sendFailed"))).not.toBeInTheDocument();
+      expect(fetchOwnAnswer).not.toHaveBeenCalled();
+      // back online: the queued write lands
+      conn.lost = false;
+      view.rerender(
+        <MemoryRouter initialEntries={["/play/123456"]}>
+          <Routes>
+            <Route path="/play/:pin" element={<PlayerGame />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await act(async () => resolve());
+      expect(await screen.findByText(t("player.answerLocked"))).toBeInTheDocument();
+    });
+  });
+
+  it("announces each new question to screen readers", () => {
+    vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+    renderPlay();
+    const live = document.querySelector("[data-phase-announcer]");
+    expect(live).toHaveAttribute("aria-live", "polite");
+    expect(live).toHaveTextContent(`${t("player.questionN", { n: 1 })}: Başkent?`);
+  });
 });
+

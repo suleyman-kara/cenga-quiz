@@ -16,6 +16,7 @@ import { HostGate } from "../host/HostGate";
 import { displayPlayers, type DisplayPlayer } from "../host/displayNames";
 import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../host/useAutoReveal";
 import { useWakeLock } from "../host/useWakeLock";
+import { useStageShortcuts } from "../host/shortcuts";
 import { useStageSounds } from "../host/useStageSounds";
 import { SoundLevelsControl, SoundOffBanner } from "../host/StageSoundControls";
 import { withRetry } from "../host/retry";
@@ -144,6 +145,8 @@ function BigScreen({ pin }: { pin: string }) {
 
   let body: ReactNode;
   let controls: ReactNode = null;
+  // keyboard / presentation remote: the step the main button would take (never "end game")
+  let next: (() => void) | null = null;
 
   if (state === undefined) body = <Loading variant="text" />;
   else if (state === null)
@@ -159,6 +162,7 @@ function BigScreen({ pin }: { pin: string }) {
     switch (state.phase) {
       case "lobby":
         body = <LobbyStage pin={pin} meta={meta} players={shown} onKick={kick} busy={busy} />;
+        if (!busy && players.length > 0) next = () => void run("startGame", { pin });
         controls = (
           <>
             <button
@@ -192,6 +196,7 @@ function BigScreen({ pin }: { pin: string }) {
             total={players.length}
           />
         );
+        if (!auto.sent && started) next = pressReveal;
         controls = (
           <button
             type="button"
@@ -204,6 +209,7 @@ function BigScreen({ pin }: { pin: string }) {
         );
         break;
       case "reveal":
+        if (!busy) next = () => void run("showLeaderboard", { pin, qIndex: state.qIndex });
         body = (
           <RevealStage
             state={state}
@@ -225,6 +231,7 @@ function BigScreen({ pin }: { pin: string }) {
         break;
       case "leaderboard": {
         const isLast = !!meta && state.qIndex >= meta.questionCount - 1;
+        if (!busy && !isLast && meta) next = () => void run("nextQuestion", { pin, qIndex: state.qIndex });
         body = (
           <div className="stage-board stack">
             <QuestionHeader state={state} meta={meta} />
@@ -285,6 +292,13 @@ function BigScreen({ pin }: { pin: string }) {
         break;
       }
     }
+
+  const dialogOpen = kickTarget !== null || askingReveal;
+  useStageShortcuts((s) => {
+    if (dialogOpen || !next) return;
+    if (s === "reveal" && state?.phase !== "question") return;
+    next();
+  });
 
   const ended = state?.phase === "ended";
   const moderating = !!state && state.phase !== "ended";

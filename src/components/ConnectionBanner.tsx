@@ -28,7 +28,7 @@ export function ConnectionBanner({ offline }: { offline?: boolean }) {
   const show = offline ?? !online;
   if (!show) return null;
   return (
-    <div className="conn-banner" role="status" aria-live="assertive">
+    <div className="conn-banner" role="status">
       <span className="conn-banner__dot" aria-hidden="true" />
       {t("common.offline")}
     </div>

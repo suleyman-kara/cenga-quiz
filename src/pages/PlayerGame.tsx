@@ -14,7 +14,8 @@ import {
 } from "../game/hooks";
 import { fetchOwnAnswer, submitAnswer } from "../game/actions";
 import { useConnectionLost } from "../game/connection";
-import { answeredChoice, clearSession, loadSession, markAnswered } from "../game/session";
+import { answeredChoice, clearSession, finishSession, loadSession, markAnswered } from "../game/session";
+import { useWakeLock } from "../host/useWakeLock";
 import { isPermissionDenied } from "../errors";
 import { Layout } from "../components/Layout";
 import { ChoiceButton } from "../components/ChoiceButton";
@@ -48,6 +49,16 @@ export function PlayerGame() {
   const lost = useConnectionLost();
   const now = useServerNow();
 
+  // Kicked (banned/{uid}) or dropped by the server at start (capacity): own entry is gone.
+  const removed = banned === true || (me === null && !!state && state.phase !== "ended");
+  const over = state === null || state?.phase === "ended";
+  // a locked phone drops the realtime connection: keep the screen on while the game runs
+  useWakeLock(!!session && !!state && !over && !removed);
+  // a finished game must not capture the next visit to the join screen
+  useEffect(() => {
+    if (over) finishSession(pin);
+  }, [over, pin]);
+
   if (!session) return <Navigate to={`/?pin=${pin}`} replace />;
 
   const leave = () => {
@@ -55,8 +66,6 @@ export function PlayerGame() {
     navigate("/", { replace: true });
   };
 
-  // Kicked (banned/{uid}) or dropped by the server at start (capacity): own entry is gone.
-  const removed = banned === true || (me === null && !!state && state.phase !== "ended");
   const name = me?.name ?? session.name;
   const computing = !!state?.lock && state.lock.at > now - 30_000;
 
@@ -113,6 +122,7 @@ export function PlayerGame() {
             state={state}
             question={question?.index === state.qIndex ? question : null}
             now={now}
+            lost={lost}
           />
         );
         break;
@@ -149,6 +159,11 @@ export function PlayerGame() {
             {t("common.computing")}
           </p>
         )}
+        <span className="sr-only" aria-live="polite" data-phase-announcer>
+          {state?.phase === "question" && !removed && question?.index === state.qIndex
+            ? `${t("player.questionN", { n: state.qIndex + 1 })}: ${question.text}`
+            : ""}
+        </span>
         {body}
       </section>
     </Layout>
@@ -173,7 +188,7 @@ function isTooLate(err: unknown, state: GameState, now: number): boolean {
 /** Screen-reader announcement only at 10 and 5 seconds left (not every tick). */
 function announcement(secs: number): string {
   if (secs <= 0 || secs > 10) return "";
-  return t("hostGame.secondsLeft", { seconds: secs <= 5 ? 5 : 10 });
+  return t("player.secondsLeft", { seconds: secs <= 5 ? 5 : 10 });
 }
 
 function QuestionView({
@@ -181,11 +196,14 @@ function QuestionView({
   state,
   question,
   now,
+  lost,
 }: {
   pin: string;
   state: GameState;
   question: PublicQuestion | null;
   now: number;
+  /** realtime connection dropped: writes are queued by the SDK and sent on reconnect */
+  lost: boolean;
 }) {
   const [sub, setSub] = useState<Submission>(() => {
     const prev = answeredChoice(pin, state.qIndex);
@@ -195,6 +213,8 @@ function QuestionView({
   const [attempt, setAttempt] = useState(0);
   const nowRef = useRef(now);
   nowRef.current = now;
+  const lostRef = useRef(lost);
+  lostRef.current = lost;
   const alive = useRef(true);
   const verifyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
@@ -252,13 +272,29 @@ function QuestionView({
     setSub({ kind: "sending", choice: i });
     navigator.vibrate?.(30);
     let settled = false;
+    let waitedOffline = false;
     clearTimeout(verifyTimer.current);
-    verifyTimer.current = setTimeout(() => {
-      if (settled || !alive.current) return;
-      void verify().then((found) => {
-        if (!found && !settled && alive.current) failedOrRejected(null);
-      });
-    }, SEND_VERIFY_MS);
+    // While offline the SDK keeps the write queued and sends it on reconnect: wait for the
+    // connection instead of failing, then give the write the usual time to be confirmed.
+    const arm = (ms: number) => {
+      verifyTimer.current = setTimeout(() => {
+        if (settled || !alive.current) return;
+        if (lostRef.current) {
+          waitedOffline = true;
+          arm(1000);
+          return;
+        }
+        if (waitedOffline) {
+          waitedOffline = false;
+          arm(SEND_VERIFY_MS);
+          return;
+        }
+        void verify().then((found) => {
+          if (!found && !settled && alive.current) failedOrRejected(null);
+        });
+      }, ms);
+    };
+    arm(SEND_VERIFY_MS);
     submitAnswer(pin, state.qIndex, i).then(
       () => {
         settled = true;
@@ -309,7 +345,7 @@ function QuestionView({
       ) : sub.kind === "sending" && picked !== null ? (
         <div className="locked locked--sending" data-choice={picked} role="status">
           <span className="locked__spinner" aria-hidden="true" />
-          <p className="locked__title">{t("player.sending")}</p>
+          <p className="locked__title">{t(lost ? "player.sendingOffline" : "player.sending")}</p>
           <p className="locked__choice">{question.options[picked]}</p>
         </div>
       ) : sub.kind === "sent" && picked !== null ? (
@@ -332,7 +368,12 @@ function QuestionView({
           </div>
         )
       )}
-      {sub.kind === "failed" && !timeUp && (
+      {lost && !leadIn && !timeUp && (sub.kind === "idle" || sub.kind === "failed") && (
+        <p className="offline-hint" role="status">
+          {t("player.offlineAnswerHint")}
+        </p>
+      )}
+      {sub.kind === "failed" && !timeUp && !lost && (
         <p className="field__error" role="alert">
           {t("player.sendFailed")}
         </p>
