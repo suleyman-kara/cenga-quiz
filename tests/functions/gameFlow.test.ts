@@ -4,6 +4,7 @@ import {
   adminDb,
   adminFs,
   adminJoin,
+  openAnswering,
   allowHost,
   disposeClients,
   expectCode,
@@ -68,13 +69,14 @@ describe("game flow (host callables)", () => {
     expect(await expectCode(host.call("startGame", { pin }))).toBe("functions/failed-precondition");
   });
 
-  it("refuses early reveal until everyone answered, then scores faster correct > slower correct > wrong", async () => {
+  it("refuses reveal during the lead-in, then scores faster correct > slower correct > wrong", async () => {
     await newGame();
     await host.call("startGame", { pin });
+    // "Hazır olun": answering has not opened yet
+    expect(await expectCode(host.call("reveal", { pin, qIndex: 0 }))).toBe("functions/failed-precondition");
+    await openAnswering(pin);
     await adminAnswer(pin, 0, "pa", 1, 500);
-    expect(await expectCode(host.call("reveal", { pin, qIndex: 0 }))).toBe("functions/failed-precondition");
     await adminAnswer(pin, 0, "pb", 1, 2500);
-    expect(await expectCode(host.call("reveal", { pin, qIndex: 0 }))).toBe("functions/failed-precondition");
     await adminAnswer(pin, 0, "pc", 3, 100);
     await host.call("reveal", { pin, qIndex: 0 });
 
@@ -106,6 +108,7 @@ describe("game flow (host callables)", () => {
   it("concurrent double reveal scores only once", async () => {
     await newGame({ pa: "Ali" });
     await host.call("startGame", { pin });
+    await openAnswering(pin);
     await adminAnswer(pin, 0, "pa", 1, 0);
     const results = await Promise.allSettled([
       host.call("reveal", { pin, qIndex: 0 }),
@@ -125,6 +128,7 @@ describe("game flow (host callables)", () => {
   it("stale or mismatched step calls", async () => {
     await newGame({ pa: "Ali" });
     await host.call("startGame", { pin });
+    await openAnswering(pin);
     expect(await expectCode(host.call("reveal", { pin, qIndex: 1 }))).toBe("functions/failed-precondition");
     expect(await expectCode(host.call("reveal", { pin } as never))).toBe("functions/invalid-argument");
     expect(await expectCode(host.call("reveal", { pin, qIndex: -1 }))).toBe("functions/invalid-argument");
@@ -144,6 +148,7 @@ describe("game flow (host callables)", () => {
   it("streak bonus, leaderboard phase, nextQuestion past last refused, endGame archives", async () => {
     await newGame();
     await host.call("startGame", { pin });
+    await openAnswering(pin);
     // Q0: pa, pb correct; pc wrong
     await adminAnswer(pin, 0, "pa", 1, 0);
     await adminAnswer(pin, 0, "pb", 1, 0);
@@ -157,6 +162,7 @@ describe("game flow (host callables)", () => {
     await host.call("nextQuestion", { pin, qIndex: 0 });
     let s = await state();
     expect(s).toMatchObject({ phase: "question", qIndex: 1 });
+    await openAnswering(pin);
     expect(await readRoom(pin, "reveal")).toBeNull();
     const q1 = await readRoom<PublicQuestion>(pin, "question");
     expect(q1.index).toBe(1);
@@ -175,6 +181,7 @@ describe("game flow (host callables)", () => {
 
     // straight from reveal to Q2
     await host.call("nextQuestion", { pin, qIndex: 1 });
+    await openAnswering(pin);
     await adminAnswer(pin, 2, "pa", 2, 0);
     await adminAnswer(pin, 2, "pb", 2, 500);
     await adminAnswer(pin, 2, "pc", 2, 0);

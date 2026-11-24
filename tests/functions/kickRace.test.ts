@@ -10,6 +10,7 @@ import {
   allowHost,
   disposeClients,
   expectCode,
+  openAnswering,
   readRoom,
   resetEmulators,
   saveQuiz,
@@ -61,6 +62,7 @@ describe("kick vs transitions (state lock)", () => {
       const uids = ["a", "b", "c", "d"].map((x) => `r${round}${x}`);
       const pin = await lobbyWith(uids);
       await host.call("startGame", { pin });
+      await openAnswering(pin);
       for (const uid of uids) await adminAnswer(pin, 0, uid, 1, 500);
       const target = uids[round % uids.length];
       await Promise.all([
