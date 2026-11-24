@@ -11,6 +11,10 @@ const allowed: Record<GameAction, Phase[]> = {
   end: ["lobby", "question", "reveal", "leaderboard"],
   kick: ["lobby", "question", "reveal", "leaderboard"],
   lockLobby: ["lobby", "question", "reveal", "leaderboard"],
+  pause: ["question"],
+  resume: ["question"],
+  extend: ["question"],
+  skip: ["question"],
 };
 const phases: Phase[] = ["lobby", "question", "reveal", "leaderboard", "ended"];
 
@@ -79,3 +83,17 @@ describe("stepStatus (expected qIndex)", () => {
     expect(status("question", 0, "start")).toBe("proceed");
   });
 });
+
+describe("stepStatus for pause / resume", () => {
+  const q = (p: Partial<{ pausedAt: number; qIndex: number }> = {}) => ({ phase: "question" as Phase, qIndex: 0, startedAt: 1, endsAt: 2, updatedAt: 0, ...p });
+  it("a second pause (double click) or a resume of a running question is 'already'", () => {
+    expect(stepStatus(q({ pausedAt: 5 }), "pause", 0)).toBe("already");
+    expect(stepStatus(q(), "resume", 0)).toBe("already");
+    expect(stepStatus(q(), "pause", 0)).toBe("proceed");
+    expect(stepStatus(q({ pausedAt: 5 }), "resume", 0)).toBe("proceed");
+  });
+  it("any of them for a question the room already left is 'already'", () => {
+    for (const a of ["pause", "resume", "extend", "skip"] as const) expect(stepStatus(q({ qIndex: 1 }), a, 0)).toBe("already");
+  });
+});
+

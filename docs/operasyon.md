@@ -76,8 +76,12 @@ içindir. Kaynaklar her maddenin altında.
   ekranı gösterir.
 - [ ] Klavye ya da sunum kumandasıyla yönetmek için: **Space**, **Enter**,
   **Page Down** ve **→** bir sonraki adıma geçer (başlat → cevabı göster →
-  sıralama → sonraki soru). **R** cevabı gösterir. Oyunu bitirmek her zaman
-  fareyle tıklama ister; bir kumanda tuşu oyunu yanlışlıkla bitiremez.
+  sıralama → sonraki soru). **R** cevabı gösterir, **P** soruyu duraklatır ya da
+  devam ettirir. Oyunu bitirmek her zaman fareyle tıklama ister; bir kumanda tuşu
+  oyunu yanlışlıkla bitiremez.
+- [ ] Soru sırasında: **Duraklat** (süre durur, cevaplar kabul edilmez; devam edince
+  verilen cevapların hızı korunur), **+15 sn** ve **Soruyu atla** (hatalı bir soruyu
+  puanlamadan geçer; son soru atlanamaz).
 
 ## 4. Etkinlik günü — lobi
 

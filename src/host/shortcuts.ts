@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 /** What a key press on the big screen asks for. */
-export type StageShortcut = "next" | "reveal";
+export type StageShortcut = "next" | "reveal" | "pause";
 
 const NEXT_KEYS = new Set([" ", "Spacebar", "Enter", "PageDown", "ArrowRight"]);
 
@@ -15,7 +15,7 @@ function isInteractive(target: EventTarget | null): boolean {
 
 /**
  * Maps a keydown to a stage step. Space / Enter / PageDown / → (presentation remotes send
- * PageDown or →) go to the next step; R reveals. Keys typed into a field, pressed on a focused
+ * PageDown or →) go to the next step; R reveals; P pauses / resumes the question. Keys typed into a field, pressed on a focused
  * control (which already acts on them) or held with a modifier are ignored.
  */
 export function stageShortcut(e: Pick<KeyboardEvent, "key" | "target" | "altKey" | "ctrlKey" | "metaKey" | "repeat">): StageShortcut | null {
@@ -23,6 +23,7 @@ export function stageShortcut(e: Pick<KeyboardEvent, "key" | "target" | "altKey"
   if (isInteractive(e.target)) return null;
   if (NEXT_KEYS.has(e.key)) return "next";
   if (e.key === "r" || e.key === "R") return "reveal";
+  if (e.key === "p" || e.key === "P") return "pause";
   return null;
 }
 

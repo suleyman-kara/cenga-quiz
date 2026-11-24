@@ -765,5 +765,62 @@ describe("HostGame", () => {
     renderHost();
     expect(hooks.useQuestionOptions).toHaveBeenLastCalledWith("123456", 1, null);
   });
+
+  describe("live question control", () => {
+    beforeEach(() => {
+      vi.mocked(hooks.useGameState).mockReturnValue(qState(0));
+      vi.mocked(hooks.useQuestion).mockReturnValue(question(0));
+    });
+
+    it("pause and +15 s call the server with the current question", async () => {
+      renderHost();
+      await userEvent.click(screen.getByRole("button", { name: t("hostGame.pause") }));
+      expect(hostCall).toHaveBeenCalledWith("pauseQuestion", { pin: "123456", qIndex: 0 });
+      await userEvent.click(screen.getByRole("button", { name: t("hostGame.extend", { seconds: 15 }) }));
+      expect(hostCall).toHaveBeenCalledWith("extendTime", { pin: "123456", qIndex: 0, seconds: 15 });
+    });
+
+    it("while paused: the clock stands still, Resume continues, reveal waits", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), pausedAt: 3_000 });
+      vi.mocked(hooks.useServerNow).mockReturnValue(19_000);
+      renderHost();
+      expect(screen.getByText(t("hostGame.paused"))).toBeInTheDocument();
+      // frozen at pausedAt: 17 s of the 20 s left, not 1 s
+      expect(screen.getByText("17")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: t("hostGame.reveal") })).toBeDisabled();
+      await userEvent.click(screen.getByRole("button", { name: t("hostGame.resume") }));
+      expect(hostCall).toHaveBeenCalledWith("resumeQuestion", { pin: "123456", qIndex: 0 });
+    });
+
+    it("no automatic reveal while paused, even past the end time", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), pausedAt: 3_000 });
+      vi.mocked(hooks.useServerNow).mockReturnValue(30_000);
+      vi.mocked(hooks.useAnswerUids).mockReturnValue(["u0", "u1"]);
+      renderHost();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(callsOf("reveal")).toHaveLength(0);
+    });
+
+    it("skip asks first, then moves on; not offered on the last question", async () => {
+      renderHost();
+      await userEvent.click(screen.getByRole("button", { name: t("hostGame.skip") }));
+      const dialog = screen.getByRole("alertdialog", { name: t("hostGame.skipConfirm") });
+      await userEvent.click(within(dialog).getByRole("button", { name: t("hostGame.skipOk") }));
+      expect(hostCall).toHaveBeenCalledWith("skipQuestion", { pin: "123456", qIndex: 0 });
+    });
+
+    it("the last question has no skip button", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(qState(2));
+      vi.mocked(hooks.useQuestion).mockReturnValue(question(2));
+      renderHost();
+      expect(screen.queryByRole("button", { name: t("hostGame.skip") })).not.toBeInTheDocument();
+    });
+
+    it("P pauses and resumes from the keyboard", async () => {
+      renderHost();
+      fireEvent.keyDown(window, { key: "p" });
+      await waitFor(() => expect(callsOf("pauseQuestion")).toHaveLength(1));
+    });
+  });
 });
 

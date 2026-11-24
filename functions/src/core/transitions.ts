@@ -1,7 +1,18 @@
 import type { GameState, LockAction, Phase } from "../../../shared/types";
 import { GameError } from "./errors";
 
-export type GameAction = "start" | "reveal" | "showLeaderboard" | "next" | "end" | "kick" | "lockLobby";
+export type GameAction =
+  | "start"
+  | "reveal"
+  | "showLeaderboard"
+  | "next"
+  | "end"
+  | "kick"
+  | "lockLobby"
+  | "pause"
+  | "resume"
+  | "extend"
+  | "skip";
 
 const FROM: Record<GameAction, readonly Phase[]> = {
   start: ["lobby"],
@@ -11,6 +22,10 @@ const FROM: Record<GameAction, readonly Phase[]> = {
   end: ["lobby", "question", "reveal", "leaderboard"],
   kick: ["lobby", "question", "reveal", "leaderboard"],
   lockLobby: ["lobby", "question", "reveal", "leaderboard"],
+  pause: ["question"],
+  resume: ["question"],
+  extend: ["question"],
+  skip: ["question"],
 };
 
 /** Throws failed-precondition when `action` is not allowed in `phase`. */
@@ -39,5 +54,7 @@ export function stepStatus(state: GameState, action: LockAction, expected?: numb
   }
   if (action === "reveal" && (state.phase === "reveal" || state.phase === "leaderboard")) return "already";
   if (action === "showLeaderboard" && state.phase === "leaderboard") return "already";
+  if (action === "pause" && state.phase === "question" && state.pausedAt) return "already";
+  if (action === "resume" && state.phase === "question" && !state.pausedAt) return "already";
   return "proceed";
 }

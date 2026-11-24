@@ -716,6 +716,18 @@ describe("PlayerGame", () => {
       expect(screen.queryByRole("button", { name: t("player.leaveLobby") })).not.toBeInTheDocument();
     });
   });
+
+  describe("paused by the host", () => {
+    it("says so, stops the clock and does not take answers", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue({ ...state("question"), pausedAt: 6_000 });
+      vi.mocked(hooks.useServerNow).mockReturnValue(15_000);
+      renderPlay();
+      expect(screen.getByText(t("player.paused"))).toBeInTheDocument();
+      for (const b of screen.getAllByRole("button", { name: /İzmir|Ankara|Bursa/ })) expect(b).toBeDisabled();
+      // frozen at 6 s: 15 s left of 20 (not 6)
+      expect(screen.getByText("15")).toBeInTheDocument();
+    });
+  });
 });
 
 function JoinProbe() {

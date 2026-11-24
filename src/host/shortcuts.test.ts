@@ -16,6 +16,7 @@ describe("stageShortcut", () => {
     for (const k of [" ", "Enter", "PageDown", "ArrowRight"]) expect(stageShortcut(ev(k))).toBe("next");
     expect(stageShortcut(ev("r"))).toBe("reveal");
     expect(stageShortcut(ev("R"))).toBe("reveal");
+    expect(stageShortcut(ev("p"))).toBe("pause");
     expect(stageShortcut(ev("x"))).toBeNull();
   });
 
