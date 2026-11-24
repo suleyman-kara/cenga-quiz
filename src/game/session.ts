@@ -69,6 +69,19 @@ export function clearSession(pin: string): void {
   }
 }
 
+/**
+ * The game is over (ended or gone): a fresh visit to the join screen should not jump back to it.
+ * The session itself stays, so this game's own page still shows its final screen on refresh.
+ */
+export function finishSession(pin: string): void {
+  try {
+    const s = storage();
+    if (s?.getItem(LAST) === pin) s.removeItem(LAST);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Call ONLY after the server accepted the answer (the RTDB set() resolved). */
 export function markAnswered(pin: string, qIndex: number, choice: number): void {
   try {

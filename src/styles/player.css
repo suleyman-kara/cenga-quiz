@@ -1779,3 +1779,14 @@
     opacity: 1;
   }
 }
+
+/* offline while a question is open: answers are queued and sent on reconnect */
+.offline-hint {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  text-align: center;
+  font-weight: 600;
+}

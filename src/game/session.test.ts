@@ -1,13 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import {
-  loadSession,
-  loadLastSession,
-  saveSession,
-  clearSession,
-  markAnswered,
-  answeredChoice,
-  SESSION_TTL_MS,
-} from "./session";
+import { SESSION_TTL_MS, answeredChoice, clearSession, finishSession, loadLastSession, loadSession, markAnswered, saveSession } from "./session";
 
 describe("player session storage", () => {
   beforeEach(() => {
@@ -59,4 +51,19 @@ describe("player session storage", () => {
     expect(answeredChoice("123456", 0)).toBeNull();
     expect(answeredChoice("654321", 0)).toBe(1);
   });
+
+  it("finishSession: a new tab no longer jumps to a finished game, but its own page still works", () => {
+    saveSession({ pin: "111111", name: "Ali" });
+    finishSession("111111");
+    expect(loadLastSession()).toBeNull();
+    expect(loadSession("111111")).toEqual({ pin: "111111", name: "Ali" });
+  });
+
+  it("finishSession leaves a newer game alone", () => {
+    saveSession({ pin: "111111", name: "Ali" });
+    saveSession({ pin: "222222", name: "Ali" });
+    finishSession("111111");
+    expect(loadLastSession()?.pin).toBe("222222");
+  });
 });
+

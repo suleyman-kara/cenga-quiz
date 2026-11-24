@@ -70,6 +70,10 @@ içindir. Kaynaklar her maddenin altında.
 - [ ] Sunucu bilgisayarı bağlantıyı kaybederse oyun **donar ama veri kaybolmaz**:
   `/host/game/<PIN>` sayfasını aynı hesapla (başka bir cihazdan da olur) açıp
   devam edebilirsiniz.
+- [ ] Klavye ya da sunum kumandasıyla yönetmek için: **Space**, **Enter**,
+  **Page Down** ve **→** bir sonraki adıma geçer (başlat → cevabı göster →
+  sıralama → sonraki soru). **R** cevabı gösterir. Oyunu bitirmek her zaman
+  fareyle tıklama ister; bir kumanda tuşu oyunu yanlışlıkla bitiremez.
 
 ## 4. Etkinlik günü — lobi
 

@@ -681,4 +681,68 @@ describe("HostGame", () => {
     renderHost();
     expect(document.querySelector(".stage-question")).not.toHaveAttribute("data-double");
   });
+
+  describe("keyboard / presentation remote shortcuts", () => {
+    const press = (key: string, target: Element | Window = window) =>
+      fireEvent.keyDown(target, { key, code: key === " " ? "Space" : key });
+
+    it("lobby: Space, Enter, PageDown and → start the game", async () => {
+      for (const key of [" ", "Enter", "PageDown", "ArrowRight"]) {
+        vi.mocked(hostCall).mockClear();
+        const { unmount } = renderHost();
+        press(key);
+        await waitFor(() => expect(callsOf("startGame")).toHaveLength(1));
+        unmount();
+      }
+    });
+
+    it("lobby without players: nothing happens", () => {
+      vi.mocked(hooks.usePlayers).mockReturnValue([]);
+      renderHost();
+      press(" ");
+      expect(hostCall).not.toHaveBeenCalled();
+    });
+
+    it("question: an early reveal by keyboard still asks first", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue(qState(0));
+      vi.mocked(hooks.useQuestion).mockReturnValue(question(0));
+      renderHost();
+      press("r");
+      expect(screen.getByRole("alertdialog")).toHaveTextContent(t("hostGame.revealEarlyConfirm"));
+      expect(callsOf("reveal")).toHaveLength(0);
+    });
+
+    it("reveal: Space shows the leaderboard; leaderboard: Space goes to the next question", async () => {
+      vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "reveal" });
+      const { unmount } = renderHost();
+      press(" ");
+      await waitFor(() => expect(callsOf("showLeaderboard")).toHaveLength(1));
+      unmount();
+      vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "leaderboard" });
+      renderHost();
+      press(" ");
+      await waitFor(() => expect(callsOf("nextQuestion")).toHaveLength(1));
+    });
+
+    it("last leaderboard: the keyboard never ends the game (end needs a click)", () => {
+      vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(2), phase: "leaderboard" });
+      renderHost();
+      press(" ");
+      press("Enter");
+      expect(callsOf("endGame")).toHaveLength(0);
+    });
+
+    it("ignores keys typed into a field or pressed on a focused button, and keys with modifiers", () => {
+      renderHost();
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      press(" ", input);
+      press("Enter", screen.getByRole("button", { name: t("hostGame.sound") }));
+      fireEvent.keyDown(window, { key: "ArrowRight", altKey: true });
+      fireEvent.keyDown(window, { key: "r", ctrlKey: true });
+      expect(callsOf("startGame")).toHaveLength(0);
+      input.remove();
+    });
+  });
 });
+
