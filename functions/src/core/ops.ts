@@ -69,6 +69,10 @@ export function planStart(room: Room | null | undefined, ctx: OpContext): Patch 
   // Over capacity: keep the earliest joiners rather than failing the start.
   const kept = order.slice(0, Math.max(0, ctx.config.maxPlayers));
   for (const uid of order.slice(kept.length)) patch[`players/${uid}`] = null;
+  // The join/leave triggers count with increments; recount here so a lost event cannot leave
+  // meta.playerCount / meta.full wrong for the rest of the game.
+  patch["meta/playerCount"] = kept.length;
+  patch["meta/full"] = kept.length >= ctx.config.maxPlayers;
   // Final display names: blocked → neutral generated name, duplicates suffixed.
   const keptPlayers = Object.fromEntries(kept.map((uid) => [uid, players[uid]]));
   // Whole objects, never `players/{uid}/name`: a child path would re-create a removed player

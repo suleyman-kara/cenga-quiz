@@ -1,31 +1,22 @@
-/** Pure logic for the RTDB join/leave triggers (games/{pin}/players/{uid}). */
-import type { GameMeta, PlayerEntry } from "../../../shared/types";
-import { activePlayers } from "./room";
-import { sanitizePlayerNames } from "./sanitize";
+/** Pure helpers for the RTDB join/leave triggers (games/{pin}/players/{uid}). */
+import { NAME_MAX } from "../../../shared/names";
+import { nameKey } from "./sanitize";
 
 /**
- * The name `uid` must get right after joining (blocked → "<prefix> N", case-insensitive duplicate
- * of an earlier joiner → " (2)"), or undefined when it can stay. Earlier joiners keep their names.
+ * RTDB key that reserves a display name in a room: case-insensitive (Turkish İ/I aware, see
+ * nameKey) and safe as a key (RTDB forbids . # $ / [ ] and control characters).
  */
-export function joinRename(players: Record<string, PlayerEntry>, uid: string, prefix: string): string | undefined {
-  const active = activePlayers({ players });
-  if (!active[uid]) return undefined;
-  return sanitizePlayerNames(active, prefix)[uid];
+export function nameClaimKey(name: string): string {
+  return encodeURIComponent(nameKey(name)).replace(/\./g, "%2E");
 }
 
-/** meta after one more player joined: count, full flag, last activity (max of join times). */
-export function metaAfterJoin(meta: GameMeta, opts: { maxPlayers: number; joinedAt: number }): GameMeta {
-  const playerCount = Math.max(0, meta.playerCount ?? 0) + 1;
-  return {
-    ...meta,
-    playerCount,
-    full: playerCount >= opts.maxPlayers,
-    lastActivityAt: Math.max(meta.lastActivityAt ?? 0, opts.joinedAt),
-  };
+/** "name (n)" shortened so it fits NAME_MAX (n ≥ 2). */
+export function suffixedName(name: string, n: number): string {
+  const suffix = ` (${n})`;
+  return name.slice(0, NAME_MAX - suffix.length).trimEnd() + suffix;
 }
 
-/** meta after a player left / was removed. */
-export function metaAfterLeave(meta: GameMeta, opts: { maxPlayers: number }): GameMeta {
-  const playerCount = Math.max(0, (meta.playerCount ?? 0) - 1);
-  return { ...meta, playerCount, full: playerCount >= opts.maxPlayers };
+/** meta.full for a player count (joins are refused by the rules while full). */
+export function fullAfterCount(playerCount: number, maxPlayers: number): boolean {
+  return playerCount >= maxPlayers;
 }

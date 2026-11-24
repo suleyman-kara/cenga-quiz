@@ -19,6 +19,10 @@
  *   scores/{uid}:         PlayerScore             (Functions write; player reads own; host reads all)
  *   leaderboard:          Leaderboard             (Functions write; top N only; host + joined players read)
  *   banned/{uid}:         true                    (Functions write on kick; that uid + host read)
+ *   hostOnline:           true                    (host's big screen writes while connected, removed on
+ *                                                  disconnect; host + joined players read)
+ * nameClaims/{pin}/…      name reservations used by the join trigger (Functions only)
+ * gameIndex/{pin}:        createdAt               (Functions only; the cleanup job walks it)
  *
  * ── Firestore ──────────────────────────────────────────────────────────────
  * allowedHosts/{email}    { addedAt }             (admin/console/script only; user may read own)

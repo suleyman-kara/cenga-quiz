@@ -56,7 +56,8 @@ içindir. Kaynaklar her maddenin altında.
   _Kaynak: github.com/firebase/firebase-js-sdk/issues/540_
 - [ ] **Soğuk başlangıcı önle (isteğe bağlı):** etkinlik günü
   `MIN_INSTANCES=1` ile deploy edin, etkinlikten sonra `0`'a geri alın.
-  Sürekli açık bir örnek boşta da ücretlendirilir.
+  Ayar hem sunucu çağrılarını hem katılım/ayrılma tetikleyicilerini kapsar, yani
+  boştayken 3 sürekli açık örnek ücretlendirilir.
   _Kaynak: firebase.google.com/docs/functions/manage-functions_
 
 ## 3. Etkinlik günü — sunum bilgisayarı
@@ -69,7 +70,10 @@ içindir. Kaynaklar her maddenin altında.
 - [ ] Projektör çözünürlüğünde (1920×1080 ve 1024×768) ekranı bir kez kontrol edin.
 - [ ] Sunucu bilgisayarı bağlantıyı kaybederse oyun **donar ama veri kaybolmaz**:
   `/host/game/<PIN>` sayfasını aynı hesapla (başka bir cihazdan da olur) açıp
-  devam edebilirsiniz.
+  devam edebilirsiniz. Oyuncuların telefonunda 10 saniye sonra "Sunucunun
+  bağlantısı koptu" uyarısı çıkar. Başlamış bir oyun **30 dakika** hiç
+  ilerlemezse temizlik işi onu bitirir, sonucu kaydeder ve telefonlarda son
+  ekranı gösterir.
 - [ ] Klavye ya da sunum kumandasıyla yönetmek için: **Space**, **Enter**,
   **Page Down** ve **→** bir sonraki adıma geçer (başlat → cevabı göster →
   sıralama → sonraki soru). **R** cevabı gösterir. Oyunu bitirmek her zaman
@@ -100,3 +104,18 @@ içindir. Kaynaklar her maddenin altında.
 - Kulüp, veri sorumlusu olarak yurt dışı aktarım için gerekli işlemleri
   (ör. standart sözleşme bildirimi) üniversitenin hukuk birimiyle teyit etmelidir.
   _Kaynak: 7499 sayılı Kanun ile değişen KVKK m.9 (1 Haziran 2024 itibarıyla)_
+
+## 6. Loglar ve uyarılar
+
+Her sunucu çağrısı Cloud Logging'e tek satır yazar: `host` mesajı,
+`{ action, pin, ms, outcome }` alanlarıyla. `outcome` değeri `ok`, `busy`
+(aynı anda iki işlem; istemci kendisi tekrar dener), `refused:<kod>` ya da
+`error` olur. Katılım tetikleyicisi `playerJoined` satırına `delayMs` yazar:
+katılımla lobideki isim düzeltmesi arasında geçen süre.
+
+İsteğe bağlı alarmlar (Google Cloud → Logging → Log-based metrics → Alerting):
+
+- `jsonPayload.outcome="error"` sayısı 5 dakikada 1'i geçerse.
+- `jsonPayload.message="playerJoined"` için `delayMs` 5 saniyeyi geçerse
+  (kalabalık katılımda gecikme).
+

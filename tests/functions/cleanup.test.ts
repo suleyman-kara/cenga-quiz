@@ -117,4 +117,50 @@ describe("runCleanup", () => {
   it("is a no-op on an empty database", async () => {
     await expect(runCleanup(Date.now())).resolves.toMatchObject({ removed: 0, archived: 0 });
   });
+
+  it("ends a started game that has not moved for 30 minutes: archived, players see the end, removed later", async () => {
+    const now = Date.now();
+    await adminDb().ref("games/300001").set(room("reveal", now - 31 * MIN, true, false));
+    await adminFs().doc("liveGames/300001").set({ pin: "300001", hostUid: "h1", quizId: "q1", quiz: { title: "x", questions: [] }, createdAt: now - HOUR });
+    const summary = await runCleanup(now);
+    expect(summary).toMatchObject({ ended: 1, archived: 1, removed: 0 });
+    expect(await readRoom("300001", "state/phase")).toBe("ended");
+    expect(await readRoom("300001", "meta/archived")).toBe(true);
+    expect((await readRoom<{ top: unknown[] }>("300001", "leaderboard")).top).toHaveLength(1);
+    expect((await adminFs().collection("gameResults").get()).size).toBe(1);
+    expect((await adminFs().doc("liveGames/300001").get()).exists).toBe(false);
+    // after the ended grace period it is removed like any ended room (archived once only)
+    await runCleanup(now + 31 * MIN);
+    expect(await readRoom("300001")).toBeNull();
+    expect((await adminFs().collection("gameResults").get()).size).toBe(1);
+  });
+
+  it("walks the room index instead of downloading every room; old rooms are indexed once", async () => {
+    const now = Date.now();
+    // a room from before the index existed (no gameIndex entry, no migration flag yet)
+    await adminDb().ref("games/400001").set(room("ended", now - 31 * MIN));
+    await runCleanup(now);
+    expect(await readRoom("400001")).toBeNull();
+    expect((await adminDb().ref("system/gameIndexV1").get()).val()).toBe(true);
+    // after the migration, a room missing from the index is not visited (no full download)
+    await adminDb().ref("games/400002").set(room("ended", now - 31 * MIN));
+    await runCleanup(now);
+    expect(await readRoom("400002")).not.toBeNull();
+    // ...an indexed one is
+    await adminDb().ref("gameIndex/400002").set(now - HOUR);
+    await runCleanup(now);
+    expect(await readRoom("400002")).toBeNull();
+    expect((await adminDb().ref("gameIndex/400002").get()).exists()).toBe(false);
+  });
+
+  it("removes a room's name claims together with the room", async () => {
+    const now = Date.now();
+    const r = room("ended", now - 31 * MIN);
+    delete (r as { players?: unknown }).players; // no join trigger racing the assertion
+    await adminDb().ref("games/500001").set(r);
+    await adminDb().ref("nameClaims/500001/k/ali").set({ uid: "pa", joinedAt: 1 });
+    await runCleanup(now);
+    expect((await adminDb().ref("nameClaims/500001").get()).exists()).toBe(false);
+  });
 });
+

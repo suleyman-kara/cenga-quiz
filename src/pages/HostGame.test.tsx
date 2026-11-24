@@ -8,9 +8,11 @@ import { club } from "../club.config";
 import { HostGame } from "./HostGame";
 import * as hooks from "../game/hooks";
 import { hostCall } from "../firebase";
+import { useHostPresence } from "../game/presence";
 
 vi.mock("../firebase", () => ({ hostCall: vi.fn() }));
 vi.mock("../game/connection", () => ({ useConnectionLost: () => false }));
+vi.mock("../game/presence", () => ({ useHostPresence: vi.fn() }));
 vi.mock("../game/host", () => ({
   useHostAuth: () => ({
     status: "authorized",
@@ -743,6 +745,14 @@ describe("HostGame", () => {
       expect(callsOf("startGame")).toHaveLength(0);
       input.remove();
     });
+  });
+
+  it("marks the host as connected while the game runs (players see when the host drops)", () => {
+    renderHost();
+    expect(useHostPresence).toHaveBeenLastCalledWith("123456", true);
+    vi.mocked(hooks.useGameState).mockReturnValue({ ...qState(0), phase: "ended" });
+    renderHost();
+    expect(useHostPresence).toHaveBeenLastCalledWith("123456", false);
   });
 });
 

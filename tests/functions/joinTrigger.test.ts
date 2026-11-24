@@ -68,8 +68,10 @@ describe("join/leave triggers", () => {
     for (const [i, p] of ps.entries()) await join(p, `Kişi${i}`);
     const m = await eventually(meta, (v) => v.playerCount === 3);
     const players = await readRoom<Record<string, PlayerEntry>>(pin, "players");
-    const lastJoin = Math.max(...Object.values(players).map((p) => p.joinedAt));
-    expect(await eventually(meta, (v) => v.lastActivityAt === lastJoin)).toMatchObject({ full: false });
+    // concurrent joins: lastActivityAt is one of the join times (only the 6 h abandon check uses it)
+    const joins = Object.values(players).map((p) => p.joinedAt);
+    expect(joins).toContain((await meta()).lastActivityAt);
+    expect(m.full).toBe(false);
     expect(m.hostUid).toBeTruthy();
     await leave(ps[0]);
     expect((await eventually(meta, (v) => v.playerCount === 2)).playerCount).toBe(2);
@@ -97,4 +99,47 @@ describe("join/leave triggers", () => {
     await new Promise((r) => setTimeout(r, 1500));
     expect(await readRoom(pin)).toBeNull();
   });
+
+  it("a burst of joins with the same name: every player ends up with a distinct name and is counted once", async () => {
+    await newGame();
+    const N = 25;
+    const ps = await Promise.all(Array.from({ length: N }, () => signInAnon()));
+    await Promise.all(ps.map((p) => join(p, "Ali")));
+    const m = await eventually(meta, (v) => v.playerCount === N, 30_000);
+    expect(m.playerCount).toBe(N);
+    const names = await eventually(
+      async () => Object.values((await readRoom<Record<string, PlayerEntry>>(pin, "players")) ?? {}).map((p) => p.name),
+      (ns) => new Set(ns.map((n) => n.toLocaleLowerCase("tr"))).size === N,
+      30_000,
+    );
+    expect(names).toContain("Ali");
+    expect(names.filter((n) => n === "Ali")).toHaveLength(1);
+  });
+
+  it("a name is free again once its owner left", async () => {
+    await newGame();
+    const [a, b] = await Promise.all([signInAnon(), signInAnon()]);
+    await join(a, "Deniz");
+    await eventually(meta, (v) => v.playerCount === 1);
+    await leave(a);
+    await eventually(meta, (v) => v.playerCount === 0);
+    await join(b, "DENİZ");
+    await eventually(meta, (v) => v.playerCount === 1);
+    // give the trigger time to (not) rename it
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(await nameOf(b.uid)()).toBe("DENİZ");
+  });
+
+  it("start recounts the players (a lost trigger cannot leave the count wrong)", async () => {
+    await newGame();
+    const [a, b] = await Promise.all([signInAnon(), signInAnon()]);
+    await join(a, "Ece");
+    await join(b, "Efe");
+    await eventually(meta, (v) => v.playerCount === 2);
+    await adminDb().ref(`games/${pin}/meta`).update({ playerCount: 77, full: true });
+    const host = await signInGoogle("host1", "host@example.com");
+    await host.call("startGame", { pin });
+    expect(await meta()).toMatchObject({ playerCount: 2, full: false });
+  });
 });
+

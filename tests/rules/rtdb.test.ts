@@ -460,3 +460,34 @@ describe("RTDB: scores", () => {
     await assertFails(player(P1).ref(`${G}/scores`).get());
   });
 });
+
+describe("RTDB: host presence (hostOnline)", () => {
+  it("only the host writes it; the host and joined players read it", async () => {
+    await seed({ phase: "question" });
+    await assertSucceeds(host().ref(`${G}/hostOnline`).set(true));
+    await assertSucceeds(host().ref(`${G}/hostOnline`).remove());
+    await assertFails(player(P1).ref(`${G}/hostOnline`).set(true));
+    await owner().ref(`${G}/hostOnline`).set(true);
+    await assertSucceeds(player(P1).ref(`${G}/hostOnline`).get());
+    await assertFails(player(OUTSIDER).ref(`${G}/hostOnline`).get());
+  });
+  it("only true (or nothing) can be stored", async () => {
+    await seed({ phase: "question" });
+    await assertFails(host().ref(`${G}/hostOnline`).set("yes"));
+    await assertFails(host().ref(`${G}/hostOnline`).set(false));
+  });
+});
+
+describe("RTDB: server-only bookkeeping", () => {
+  it("clients can neither read nor write name claims, the room index or system flags", async () => {
+    await seed();
+    await owner().ref(`nameClaims/${PIN}/k/ali`).set(P1);
+    await owner().ref(`gameIndex/${PIN}`).set(1);
+    for (const path of [`nameClaims/${PIN}`, `gameIndex/${PIN}`, "gameIndex", "system/gameIndexV1"]) {
+      await assertFails(host().ref(path).get());
+      await assertFails(player(P1).ref(path).get());
+      await assertFails(player(P1).ref(path).set(null));
+    }
+  });
+});
+

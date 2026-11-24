@@ -1,50 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { joinRename, metaAfterJoin, metaAfterLeave } from "./joins";
-import { lobbyRoom } from "./fixtures";
-import type { GameMeta, PlayerEntry } from "../../../shared/types";
+import { NAME_MAX } from "../../../shared/names";
+import { fullAfterCount, nameClaimKey, suffixedName } from "./joins";
 
-const meta = (): GameMeta => lobbyRoom().meta!;
-const players = (entries: [string, string, number][]): Record<string, PlayerEntry> =>
-  Object.fromEntries(entries.map(([uid, name, joinedAt]) => [uid, { name, joinedAt }]));
+describe("name claims (join trigger without reading every player)", () => {
+  it("nameClaimKey is case-insensitive (Turkish İ/I aware) and a valid RTDB key", () => {
+    expect(nameClaimKey("ALİ")).toBe(nameClaimKey("ali"));
+    expect(nameClaimKey("IŞIK")).toBe(nameClaimKey("ışık"));
+    expect(nameClaimKey("Ali")).not.toBe(nameClaimKey("Ali (2)"));
+    for (const n of ["a.b", "x/y", "#1", "$", "[z]", "Ali Veli", "ç.ş"]) expect(nameClaimKey(n)).not.toMatch(/[.#$\/\[\]]/);
+  });
 
-describe("joinRename", () => {
-  it("returns undefined for a clean, unique name", () => {
-    expect(joinRename(players([["a", "Ali", 1], ["b", "Banu", 2]]), "b", "Oyuncu")).toBeUndefined();
+  it("suffixedName: ' (n)' appended, the name shortened so the result still fits", () => {
+    expect(suffixedName("Ali", 2)).toBe("Ali (2)");
+    const long = suffixedName("x".repeat(40), 12);
+    expect(long.endsWith(" (12)")).toBe(true);
+    expect(long.length).toBeLessThanOrEqual(NAME_MAX);
   });
-  it("replaces a blocked name with '<prefix> N'", () => {
-    expect(joinRename(players([["a", "Ali", 1], ["b", "s1kt1r", 2]]), "b", "Oyuncu")).toBe("Oyuncu 1");
-  });
-  it("skips generated names that are already taken", () => {
-    const p = players([["a", "Oyuncu 1", 1], ["b", "orospu", 2]]);
-    expect(joinRename(p, "b", "Oyuncu")).toBe("Oyuncu 2");
-  });
-  it("suffixes a case-insensitive duplicate of an earlier joiner (Turkish İ/I aware)", () => {
-    expect(joinRename(players([["a", "ALİ", 1], ["b", "ali", 2]]), "b", "Oyuncu")).toBe("ali (2)");
-    expect(joinRename(players([["a", "Ali", 1], ["b", "ali (2)", 2], ["c", "ALI", 3]]), "c", "Oyuncu")).toBeUndefined();
-    expect(joinRename(players([["a", "Ali", 1], ["b", "ali (2)", 2], ["c", "ALİ", 3]]), "c", "Oyuncu")).toBe("ALİ (3)");
-  });
-  it("never renames the earlier joiner; ignores missing / partial entries", () => {
-    expect(joinRename(players([["a", "Ali", 1], ["b", "ali", 2]]), "a", "Oyuncu")).toBeUndefined();
-    expect(joinRename(players([["a", "Ali", 1]]), "zz", "Oyuncu")).toBeUndefined();
-    const partial = { a: { name: "Ali" } } as unknown as Record<string, PlayerEntry>;
-    expect(joinRename(partial, "a", "Oyuncu")).toBeUndefined();
-  });
-});
 
-describe("metaAfterJoin / metaAfterLeave", () => {
-  it("counts joins, marks the lobby full at maxPlayers and tracks the last join time", () => {
-    let m: GameMeta = meta();
-    m = metaAfterJoin(m, { maxPlayers: 2, joinedAt: 5000 });
-    expect(m).toMatchObject({ playerCount: 1, full: false, lastActivityAt: 5000 });
-    m = metaAfterJoin(m, { maxPlayers: 2, joinedAt: 4000 }); // out-of-order delivery keeps the max
-    expect(m).toMatchObject({ playerCount: 2, full: true, lastActivityAt: 5000 });
-    expect(m.hostUid).toBe("host");
-  });
-  it("leaves decrement (never below 0) and clear full", () => {
-    let m: GameMeta = { ...meta(), playerCount: 2, full: true };
-    m = metaAfterLeave(m, { maxPlayers: 2 });
-    expect(m).toMatchObject({ playerCount: 1, full: false });
-    m = metaAfterLeave(metaAfterLeave(m, { maxPlayers: 2 }), { maxPlayers: 2 });
-    expect(m.playerCount).toBe(0);
+  it("fullAfterCount: full at maxPlayers, open below", () => {
+    expect(fullAfterCount(299, 300)).toBe(false);
+    expect(fullAfterCount(300, 300)).toBe(true);
+    expect(fullAfterCount(301, 300)).toBe(true);
   });
 });
