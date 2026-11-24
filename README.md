@@ -53,10 +53,14 @@ canlı quiz sistemi.
 - **Kulübe özel görünüm:** Ad, logo, renkler, fontlar, şık şekilleri ve final
   ekranı tek bir dosyada (`src/club.config.ts`).
 - **Lobi güvenliği:** Takma ad filtresi, en fazla 300 oyuncu (ayarlanabilir).
+- **Sonuçlar ve istatistik:** Panelde geçmiş oyunlar listelenir; her biri için
+  sıralama ve soru bazında doğru cevap oranı CSV olarak indirilir. Yarım kalan
+  (açık) oyunlara panelden dönülür.
 - **Kopmaya dayanıklı:** Oyuncu ekranı kilitlerse ya da sunucu bilgisayarı
   bağlantıyı kaybederse oyun kaldığı yerden devam eder.
 - **Quiz hazırlama:** Sorular panelden elle eklenip düzenlenir (şıklar, doğru cevap,
-  süre, görsel; çoğaltma, sürükle-bırak sıralama). "1. Soru… A) … Doğru Cevap: B"
+  süre, görsel; çoğaltma, sürükle-bırak sıralama). Görsel bir adresle verilebilir ya da
+  panelden yüklenir; tarayıcıda küçültülüp Firebase Storage'a kaydedilir. "1. Soru… A) … Doğru Cevap: B"
   biçimindeki metin yapıştırılınca sorular otomatik oluşur. JSON içe/dışa aktarma ve
   editör desteği için [JSON Schema](quizzes/quiz.schema.json) var.
 - **Sunucu girişi:** E-posta + şifre; sadece izin listesindeki e-postalar kayıt

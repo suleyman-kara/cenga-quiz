@@ -7,12 +7,14 @@ import { initializeTestEnvironment, type RulesTestEnvironment, type TokenOptions
 import { deleteApp, initializeApp, type FirebaseApp } from "@firebase/app";
 import { connectDatabaseEmulator, get, getDatabase, ref, remove, set, update, type Database } from "firebase/database";
 import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore";
+import { connectStorageEmulator, getStorage, type FirebaseStorage } from "firebase/storage";
 
 export const PROJECT_ID = "demo-club-quiz";
 const ROOT = join(__dirname, "..", "..");
 const HOST = "127.0.0.1";
 const DB_PORT = 9000;
 const FS_PORT = 8080;
+const STORAGE_PORT = 9199;
 
 export const HOST_UID = "host-1";
 export const HOST_EMAIL = "host@example.com";
@@ -23,7 +25,15 @@ export const hostToken = {
 } as TokenOptions;
 export const anonToken = { firebase: { sign_in_provider: "anonymous" } } as TokenOptions;
 
-export function createEnv(kind: "database" | "firestore"): Promise<RulesTestEnvironment> {
+export function createEnv(kind: "database" | "firestore" | "storage"): Promise<RulesTestEnvironment> {
+  if (kind === "storage") {
+    // storage rules look up allowedHosts in Firestore (cross-service rules)
+    return initializeTestEnvironment({
+      projectId: PROJECT_ID,
+      storage: { host: HOST, port: STORAGE_PORT, rules: readFileSync(join(ROOT, "rules/storage.rules"), "utf8") },
+      firestore: { host: HOST, port: FS_PORT, rules: readFileSync(join(ROOT, "rules/firestore.rules"), "utf8") },
+    });
+  }
   if (kind === "database") {
     return initializeTestEnvironment({
       projectId: PROJECT_ID,
@@ -73,6 +83,15 @@ export function firestoreAs(who: Who): Firestore {
   const fs = getFirestore(app);
   connectFirestoreEmulator(fs, HOST, FS_PORT, mockUserToken ? { mockUserToken } : {});
   return fs;
+}
+
+export const STORAGE_BUCKET = `${PROJECT_ID}.appspot.com`;
+
+export function storageAs(who: Who): FirebaseStorage {
+  const { app, mockUserToken } = appFor(who);
+  const st = getStorage(app, `gs://${STORAGE_BUCKET}`);
+  connectStorageEmulator(st, HOST, STORAGE_PORT, mockUserToken ? { mockUserToken } : {});
+  return st;
 }
 
 export async function disposeClients() {

@@ -5,7 +5,8 @@ import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
 import { translate } from "../i18n";
 import { club } from "../club.config";
 import { HostPage } from "./HostPage";
-import { useHostAuth, useMyQuizzes, saveQuiz, deleteQuiz, loadQuiz } from "../game/host";
+import { useHostAuth, useMyQuizzes, useMyLiveGames, useMyResults, saveQuiz, deleteQuiz, loadQuiz } from "../game/host";
+import { downloadResultCsv } from "../host/results";
 import { validateQuiz } from "../../shared/quizValidate";
 import { hostCall } from "../firebase";
 
@@ -13,10 +14,13 @@ vi.mock("../firebase", () => ({ hostCall: vi.fn() }));
 vi.mock("../game/host", () => ({
   useHostAuth: vi.fn(),
   useMyQuizzes: vi.fn(),
+  useMyLiveGames: vi.fn(),
+  useMyResults: vi.fn(),
   saveQuiz: vi.fn(),
   deleteQuiz: vi.fn(),
   loadQuiz: vi.fn(),
 }));
+vi.mock("../host/results", () => ({ downloadResultCsv: vi.fn() }));
 vi.mock("../../shared/quizValidate", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../shared/quizValidate")>()),
   validateQuiz: vi.fn(),
@@ -55,6 +59,8 @@ describe("HostPage", () => {
       loading: false,
       error: null,
     });
+    vi.mocked(useMyLiveGames).mockReturnValue({ games: [], error: null });
+    vi.mocked(useMyResults).mockReturnValue({ results: [], error: null });
     vi.mocked(saveQuiz).mockReset().mockResolvedValue("newId");
     vi.mocked(deleteQuiz).mockReset().mockResolvedValue(undefined);
     vi.mocked(validateQuiz).mockReset();
@@ -207,4 +213,53 @@ describe("HostPage", () => {
       expect(downloads).toEqual([]);
     });
   });
+
+  describe("open games and past results", () => {
+    const result = {
+      id: "123456_1",
+      pin: "123456",
+      hostUid: "h1",
+      quizId: "quiz1",
+      title: "Tarih",
+      createdAt: 1,
+      endedAt: Date.UTC(2026, 10, 20, 18, 0),
+      playerCount: 42,
+      questionCount: 7,
+      expireAt: new Date(0),
+      results: [],
+    };
+
+    it("lists the host's open games with a way back to the big screen", async () => {
+      vi.mocked(useMyLiveGames).mockReturnValue({ games: [{ pin: "654321", title: "Tarih", createdAt: Date.now() - 60_000 }], error: null });
+      renderPage();
+      const section = screen.getByRole("region", { name: t("host.liveGamesTitle") });
+      expect(within(section).getByText("654321")).toBeInTheDocument();
+      await userEvent.click(within(section).getByRole("link", { name: t("host.backToGame") }));
+      expect(await screen.findByText("BIG SCREEN")).toBeInTheDocument();
+    });
+
+    it("no open-games section when there is none", () => {
+      renderPage();
+      expect(screen.queryByRole("region", { name: t("host.liveGamesTitle") })).not.toBeInTheDocument();
+    });
+
+    it("lists past results; each one downloads its ranking and its question stats as CSV", async () => {
+      vi.mocked(useMyResults).mockReturnValue({ results: [result], error: null });
+      renderPage();
+      const section = screen.getByRole("region", { name: t("host.resultsTitle") });
+      expect(within(section).getByText("Tarih")).toBeInTheDocument();
+      expect(within(section).getByText(t("host.resultPlayers", { count: 42 }), { exact: false })).toBeInTheDocument();
+      await userEvent.click(within(section).getByRole("button", { name: t("host.downloadRanking") }));
+      expect(downloadResultCsv).toHaveBeenCalledWith(result, "siralama");
+      await userEvent.click(within(section).getByRole("button", { name: t("host.downloadQuestions") }));
+      expect(downloadResultCsv).toHaveBeenCalledWith(result, "sorular");
+    });
+
+    it("says so when there are no results yet, and how long they are kept", () => {
+      renderPage();
+      const section = screen.getByRole("region", { name: t("host.resultsTitle") });
+      expect(within(section).getByText(t("host.noResults", { days: club.game.resultsRetentionDays }))).toBeInTheDocument();
+    });
+  });
 });
+

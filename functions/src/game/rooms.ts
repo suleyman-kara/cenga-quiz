@@ -5,7 +5,7 @@ import type { Patch, Room } from "../core/room";
 import { database, firestore } from "./firebase";
 
 /** Room nodes a transition may need besides meta/state. */
-export type RoomPart = "players" | "answers" | "scores" | "leaderboard" | "banned";
+export type RoomPart = "players" | "answers" | "scores" | "leaderboard" | "banned" | "stats";
 
 /** meta + state only (small): enough for host and phase checks. */
 export async function readHead(pin: string): Promise<Pick<Room, "meta" | "state">> {

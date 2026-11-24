@@ -7,6 +7,7 @@ import {
   useHostOnline,
   useLeaderboard,
   useMyPlayer,
+  useMeta,
   useMyScore,
   usePlayerUid,
   useQuestion,
@@ -14,7 +15,7 @@ import {
   useReveal,
   useServerNow,
 } from "../game/hooks";
-import { fetchOwnAnswer, submitAnswer } from "../game/actions";
+import { fetchOwnAnswer, leaveLobby, submitAnswer } from "../game/actions";
 import { useConnectionLost } from "../game/connection";
 import { answeredChoice, clearSession, finishSession, loadSession, markAnswered } from "../game/session";
 import { useWakeLock } from "../host/useWakeLock";
@@ -30,6 +31,7 @@ import { GapLine, MoveLine } from "../components/GapLine";
 import { DoubleBadge } from "../components/DoubleBadge";
 import { Leaderboard as LeaderboardList, isHotStreak } from "../components/Leaderboard";
 import { Confetti } from "../components/Confetti";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { club } from "../club.config";
 import { t } from "../i18n";
 
@@ -56,6 +58,8 @@ export function PlayerGame() {
   const lost = useConnectionLost();
   const now = useServerNow();
   const hostOnline = useHostOnline(pin);
+  const meta = useMeta(pin);
+  const [askLeave, setAskLeave] = useState(false);
 
   // Kicked (banned/{uid}) or dropped by the server at start (capacity): own entry is gone.
   const removed = banned === true || (me === null && !!state && state.phase !== "ended");
@@ -75,6 +79,13 @@ export function PlayerGame() {
   const leave = () => {
     clearSession(pin);
     navigate("/", { replace: true });
+  };
+  // wrong game or a typo in the name: leave the lobby and join again
+  const leaveAndRejoin = async () => {
+    setAskLeave(false);
+    await leaveLobby(pin).catch(() => undefined);
+    clearSession(pin);
+    navigate(`/?pin=${pin}`, { replace: true });
   };
 
   const name = me?.name ?? session.name;
@@ -117,11 +128,17 @@ export function PlayerGame() {
             </div>
             <h1 className="headline">{t("player.lobbyTitle")}</h1>
             <p className="lead muted">{t("player.lobbyHint")}</p>
+            {typeof meta?.playerCount === "number" && meta.playerCount > 0 && (
+              <p className="lobby-count">{t("player.lobbyCount", { count: meta.playerCount })}</p>
+            )}
             <span className="wait-dots" aria-hidden="true">
               <span />
               <span />
               <span />
             </span>
+            <button type="button" className="btn btn--ghost btn--small" onClick={() => setAskLeave(true)}>
+              {t("player.leaveLobby")}
+            </button>
           </div>
         );
         break;
@@ -182,6 +199,14 @@ export function PlayerGame() {
         </span>
         {body}
       </section>
+      <ConfirmDialog
+        open={askLeave && state?.phase === "lobby"}
+        message={t(meta?.locked ? "player.leaveConfirmLocked" : "player.leaveConfirm")}
+        confirmLabel={t("player.leaveOk")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => void leaveAndRejoin()}
+        onCancel={() => setAskLeave(false)}
+      />
     </Layout>
   );
 }

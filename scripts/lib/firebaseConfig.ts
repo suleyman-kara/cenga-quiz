@@ -10,6 +10,8 @@ export interface WebConfig {
   databaseURL: string;
   projectId: string;
   appId: string;
+  /** optional in the snippet; the client falls back to <projectId>.firebasestorage.app */
+  storageBucket?: string;
 }
 
 const REQUIRED: (keyof WebConfig)[] = ["apiKey", "authDomain", "databaseURL", "projectId", "appId"];
@@ -24,7 +26,7 @@ export function parseFirebaseConfig(input: string): ParseResult {
   // key: "value"  |  "key": "value"   (single or double quotes)
   const re = /["']?([A-Za-z]+)["']?\s*:\s*(["'])((?:\\.|(?!\2).)*)\2/g;
   for (const m of input.matchAll(re)) {
-    if ((REQUIRED as string[]).includes(m[1]) && !(m[1] in found)) found[m[1]] = m[3];
+    if ([...REQUIRED, "storageBucket"].includes(m[1]) && !(m[1] in found)) found[m[1]] = m[3];
   }
 
   const errors: string[] = [];
@@ -44,6 +46,7 @@ export function parseFirebaseConfig(input: string): ParseResult {
   if (errors.length) return { ok: false, errors };
 
   const config = Object.fromEntries(REQUIRED.map((k) => [k, found[k]])) as unknown as WebConfig;
+  if (found.storageBucket) config.storageBucket = found.storageBucket;
   const warnings: string[] = [];
   if (!config.databaseURL.endsWith(".europe-west1.firebasedatabase.app")) {
     warnings.push(
@@ -78,6 +81,7 @@ export function buildOutputs(cfg: WebConfig, opts: { recaptchaSiteKey?: string }
       `VITE_FIREBASE_DATABASE_URL=${cfg.databaseURL}`,
       `VITE_FIREBASE_APP_ID=${cfg.appId}`,
       `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY=${opts.recaptchaSiteKey ?? ""}`,
+      `VITE_FIREBASE_STORAGE_BUCKET=${cfg.storageBucket ?? ""}`,
     ].join("\n") +
     "\n";
   return {

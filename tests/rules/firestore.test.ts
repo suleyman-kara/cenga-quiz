@@ -193,11 +193,17 @@ describe("Firestore: quizzes", () => {
 });
 
 describe("Firestore: liveGames", () => {
-  it("no client access at all, not even for the host", async () => {
-    await assertFails(getDoc(doc(hostDb(), "liveGames", "123456")));
-    await assertFails(getDoc(doc(anonDb(), "liveGames", "123456")));
+  it("the host lists and reads only their own open games (to return to one from the panel)", async () => {
+    await assertSucceeds(getDoc(doc(hostDb(), "liveGames", "123456")));
+    await assertSucceeds(getDocs(query(collection(hostDb(), "liveGames"), where("hostUid", "==", HOST_UID))));
     await assertFails(getDocs(collection(hostDb(), "liveGames")));
+    await assertFails(getDoc(doc(otherHostDb(), "liveGames", "123456")));
+    await assertFails(getDoc(doc(anonDb(), "liveGames", "123456")));
+    await assertFails(getDoc(doc(unauthDb(), "liveGames", "123456")));
+  });
+  it("only Cloud Functions write them", async () => {
     await assertFails(setDoc(doc(hostDb(), "liveGames", "999999"), { hostUid: HOST_UID }));
+    await assertFails(updateDoc(doc(hostDb(), "liveGames", "123456"), { createdAt: 2 }));
     await assertFails(deleteDoc(doc(hostDb(), "liveGames", "123456")));
   });
 });

@@ -1,4 +1,4 @@
-import { get, ref, serverTimestamp, set } from "firebase/database";
+import { get, ref, remove, serverTimestamp, set } from "firebase/database";
 import { signInAnonymously } from "firebase/auth";
 import type { AnswerEntry, GameMeta, GameState, PlayerEntry } from "../../shared/types";
 import { auth, db } from "../firebase";
@@ -54,6 +54,12 @@ export async function submitAnswer(pin: string, qIndex: number, choice: number):
   const uid = await ensureUid();
   const entry: ServerStamped<AnswerEntry, "at"> = { choice, at: serverTimestamp() };
   await set(ref(db, paths.answer(pin, qIndex, uid)), entry);
+}
+
+/** Leaves the lobby (wrong game, typo in the name): removes the player's own entry. */
+export async function leaveLobby(pin: string): Promise<void> {
+  const uid = await ensureUid();
+  await remove(ref(db, paths.player(pin, uid)));
 }
 
 /**

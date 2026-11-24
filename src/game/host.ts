@@ -10,7 +10,7 @@ import {
   type User,
 } from "firebase/auth";
 import { addDoc, collection, deleteDoc, deleteField, doc, getDoc, onSnapshot, query, updateDoc, where } from "firebase/firestore";
-import type { Quiz, QuizDoc } from "../../shared/types";
+import type { GameResultDoc, LiveGameDoc, Quiz, QuizDoc } from "../../shared/types";
 import { auth, checkHostEmail } from "../firebase";
 import { firestore } from "../firestore";
 
@@ -215,3 +215,55 @@ export async function updateQuiz(id: string, quiz: Quiz): Promise<void> {
 export async function deleteQuiz(id: string): Promise<void> {
   await deleteDoc(doc(firestore, "quizzes", id));
 }
+
+export interface LiveGameItem {
+  pin: string;
+  title: string;
+  createdAt: number;
+}
+
+/** The host's games that are still running (liveGames is removed when a game ends). */
+export function useMyLiveGames(uid: string | null): { games: LiveGameItem[]; error: string | null } {
+  const [state, setState] = useState<{ games: LiveGameItem[]; error: string | null }>({ games: [], error: null });
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(collection(firestore, "liveGames"), where("hostUid", "==", uid));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const games = snap.docs
+          .map((d) => {
+            const data = d.data() as Partial<LiveGameDoc>;
+            return { pin: d.id, title: data.quiz?.title ?? d.id, createdAt: data.createdAt ?? 0 };
+          })
+          .sort((a, b) => b.createdAt - a.createdAt);
+        setState({ games, error: null });
+      },
+      (err) => setState({ games: [], error: err.message }),
+    );
+  }, [uid]);
+  return state;
+}
+
+export type ResultItem = GameResultDoc & { id: string };
+
+/** The host's archived games, newest first (deleted by the TTL policy after resultsRetentionDays). */
+export function useMyResults(uid: string | null): { results: ResultItem[]; error: string | null } {
+  const [state, setState] = useState<{ results: ResultItem[]; error: string | null }>({ results: [], error: null });
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(collection(firestore, "gameResults"), where("hostUid", "==", uid));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const results = snap.docs
+          .map((d) => ({ ...(d.data() as GameResultDoc), id: d.id }))
+          .sort((a, b) => b.endedAt - a.endedAt);
+        setState({ results, error: null });
+      },
+      (err) => setState({ results: [], error: err.message }),
+    );
+  }, [uid]);
+  return state;
+}
+

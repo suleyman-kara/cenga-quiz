@@ -24,6 +24,7 @@ yayına almak içindir. Toplam süre: ~30 dakika (ilk Functions deploy'u 5-10 dk
 | **Authentication** → Sign-in method | **Email/Password**'ü etkinleştir ("Email link" kapalı kalabilir) ve **Anonymous**'u etkinleştir. Sunucular e-posta + şifreyle girer. |
 | **Firestore Database** | Oluştur → *Production mode* → konum: `eur3 (Europe)` veya `europe-west1`. Kurallar deploy ile gelir. |
 | **Realtime Database** | Oluştur → konum: **Belçika (`europe-west1`)** → *Locked mode*. Kurallar deploy ile gelir. |
+| **Storage** | *Get started* → *Production mode* → konum: `europe-west1`. Quiz görselleri panelden buraya yüklenir; kurallar deploy ile gelir. **Deploy'dan önce açılmalı**, yoksa `npm run deploy` Storage kuralları adımında durur. |
 | **Hosting** | Ayrıca bir şey yapmaya gerek yok; ilk deploy açar. |
 
 > Realtime Database **mutlaka** `europe-west1`'de olmalı: oyuncu katılım

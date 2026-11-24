@@ -97,6 +97,12 @@ describe("planReveal", () => {
     expect(out.scores?.p2).toMatchObject({ score: 0, lastDelta: 0, lastAnswered: false, lastCorrect: false });
   });
 
+  it("keeps a small per-question record for the archive (text, correct option, answer counts)", () => {
+    const r = applyPatch(started(10_000), { "answers/0/p1": { choice: 2, at: 11_000 }, "answers/0/p2": { choice: 0, at: 11_500 } }) as Room;
+    const patch = planReveal(r, { ...host, now: 12_000 });
+    expect(patch["stats/0"]).toEqual({ text: "S1", correct: 2, counts: [1, 0, 1, 0], players: 2 });
+  });
+
   it("host may reveal early with no answers at all: everyone gets 0", () => {
     const r = started(10_000);
     const out = applyPatch(r, planReveal(r, { ...host, now: 10_000 })) as Room;

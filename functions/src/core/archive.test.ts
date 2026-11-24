@@ -36,6 +36,7 @@ describe("buildGameResult", () => {
         { uid: "p3", name: "Can", score: 500, rank: 2, correctCount: 1 },
         { uid: "p4", name: "Deniz", score: 0, rank: 4, correctCount: 0 },
       ],
+      questions: [],
     });
   });
 
@@ -46,6 +47,20 @@ describe("buildGameResult", () => {
     };
     expect(buildGameResult(room, { pin: "1", now: 1, retentionDays: 1 }).results).toEqual([
       { uid: "p1", name: "Ali", score: 500, rank: 1, correctCount: 1 },
+    ]);
+  });
+
+  it("adds per-question stats in question order (correct rate per question for the CSV)", () => {
+    const room = {
+      ...lobbyRoom({ p1: "Ali" }),
+      stats: {
+        1: { text: "İkinci", correct: 0, counts: [3, 1], players: 5 },
+        0: { text: "Birinci", correct: 2, counts: [0, 1, 4, 0], players: 5 },
+      },
+    } as Room;
+    expect(buildGameResult(room, { pin: "1", now: 1, retentionDays: 1 }).questions).toEqual([
+      { index: 0, text: "Birinci", correct: 2, counts: [0, 1, 4, 0], players: 5 },
+      { index: 1, text: "İkinci", correct: 0, counts: [3, 1], players: 5 },
     ]);
   });
 

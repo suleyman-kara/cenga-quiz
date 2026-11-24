@@ -115,7 +115,8 @@ const SPECS = {
     action: "end",
     plan: planEnd,
     needsQuiz: false,
-    parts: ["players", "scores", "leaderboard", "banned"],
+    // stats: per-question records for the archived result
+    parts: ["players", "scores", "leaderboard", "banned", "stats"],
     precheck: false,
   },
 } satisfies Record<Exclude<LockAction, "kick">, TransitionSpec>;
