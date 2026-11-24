@@ -9,6 +9,11 @@
         "question": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
         "reveal": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
         "leaderboard": { ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())" },
+        "hostOnline": {
+          ".read": "auth != null && (root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid || root.child('games/' + $pin + '/players/' + auth.uid).exists())",
+          ".write": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
+          ".validate": "newData.val() === true"
+        },
         "players": {
           ".read": "auth != null && root.child('games/' + $pin + '/meta/hostUid').val() === auth.uid",
           ".indexOn": ["joinedAt"],

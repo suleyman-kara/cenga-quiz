@@ -12,4 +12,5 @@ export const paths = {
   score: (pin: string, uid: string) => `${gamePath(pin)}/scores/${uid}`,
   leaderboard: (pin: string) => `${gamePath(pin)}/leaderboard`,
   banned: (pin: string, uid: string) => `${gamePath(pin)}/banned/${uid}`,
+  hostOnline: (pin: string) => `${gamePath(pin)}/hostOnline`,
 };

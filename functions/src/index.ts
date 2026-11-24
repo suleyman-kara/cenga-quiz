@@ -5,7 +5,8 @@ import { onValueCreated, onValueDeleted } from "firebase-functions/database";
 import { defineBoolean, defineInt } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import { FUNCTIONS_REGION } from "../../shared/types";
-import { GameError } from "./core/errors";
+import { GameError, type GameErrorCode } from "./core/errors";
+import { callLog } from "./core/callLog";
 import { dispatchHost } from "./game/callables";
 import { createCheckHostEmail } from "./game/checkHost";
 import { hostCheck } from "./game/hostAuth";
@@ -18,7 +19,7 @@ setGlobalOptions({ region: FUNCTIONS_REGION, maxInstances: 10 });
 /** Keep N instances warm during an event (e.g. 1), back to 0 afterwards. */
 const MIN_INSTANCES = defineInt("MIN_INSTANCES", {
   default: 0,
-  description: "Warm instances for the host callables (set 1 during an event).",
+  description: "Warm instances for the host callables and the join/leave triggers (set 1 during an event).",
 });
 /** Turn on once the web client initializes App Check (off by default so local/emulator works). */
 const ENFORCE_APP_CHECK = defineBoolean("ENFORCE_APP_CHECK", {
@@ -28,13 +29,21 @@ const ENFORCE_APP_CHECK = defineBoolean("ENFORCE_APP_CHECK", {
 
 /** Single dispatcher for every host action, so one warm instance serves the whole event. */
 export const host = onCall({ minInstances: MIN_INSTANCES, enforceAppCheck: ENFORCE_APP_CHECK }, async (req) => {
+  const t0 = Date.now();
   try {
-    return (await dispatchHost(req.auth, req.data)).result;
+    const { result } = await dispatchHost(req.auth, req.data);
+    const { fields } = callLog(req.data, Date.now() - t0);
+    logger.info("host", fields);
+    return result;
   } catch (e) {
+    // an HttpsError is a deliberate refusal too (same as GameError), logged with its own code
+    const asGame = e instanceof HttpsError ? new GameError(e.code as GameErrorCode, e.message) : e;
+    const { severity, fields } = callLog(req.data, Date.now() - t0, asGame);
+    if (severity === "error") logger.error("host", fields, e);
+    else if (severity === "warn") logger.warn("host", fields);
+    else logger.info("host", fields);
     if (e instanceof GameError) throw new HttpsError(e.code, e.message);
     if (e instanceof HttpsError) throw e;
-    const action = (req.data as { action?: unknown } | null)?.action;
-    logger.error(`host(${String(action)}) failed`, e);
     throw new HttpsError("internal", "Beklenmeyen bir hata oluştu.");
   }
 });
@@ -75,13 +84,20 @@ const PLAYER_REF = {
   ref: "/games/{pin}/players/{uid}",
   instance: "*-default-rtdb",
   region: databaseTriggerRegion(process.env, FUNCTIONS_REGION),
+  // the first wave of joins must not wait for cold starts either
+  minInstances: MIN_INSTANCES,
 };
 
 /** Sanitizes the name right away and keeps meta.playerCount / full / lastActivityAt current. */
 export const playerJoined = onValueCreated(PLAYER_REF, async (event) => {
-  await onPlayerJoined(event.params.pin, event.params.uid, event.data.val());
+  const t0 = Date.now();
+  const out = await onPlayerJoined(event.params.pin, event.params.uid, event.data.val());
+  // delay = time from the join write to the trigger finishing (lobby lag under load)
+  logger.info("playerJoined", { pin: event.params.pin, ms: Date.now() - t0, delayMs: Date.now() - Date.parse(event.time), ...out });
 });
 
 export const playerLeft = onValueDeleted(PLAYER_REF, async (event) => {
-  await onPlayerLeft(event.params.pin);
+  const t0 = Date.now();
+  const playerCount = await onPlayerLeft(event.params.pin, event.params.uid, event.data.val());
+  logger.info("playerLeft", { pin: event.params.pin, ms: Date.now() - t0, playerCount });
 });

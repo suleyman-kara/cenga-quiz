@@ -4,6 +4,7 @@ import type { GameState, Leaderboard, PlayerScore, PublicQuestion, RevealData } 
 import {
   useBanned,
   useGameState,
+  useHostOnline,
   useLeaderboard,
   useMyPlayer,
   useMyScore,
@@ -48,6 +49,7 @@ export function PlayerGame() {
   const banned = useBanned(pin, uid);
   const lost = useConnectionLost();
   const now = useServerNow();
+  const hostOnline = useHostOnline(pin);
 
   // Kicked (banned/{uid}) or dropped by the server at start (capacity): own entry is gone.
   const removed = banned === true || (me === null && !!state && state.phase !== "ended");
@@ -58,6 +60,9 @@ export function PlayerGame() {
   useEffect(() => {
     if (over) finishSession(pin);
   }, [over, pin]);
+  // mid-game only (a lobby simply waits); a short blip is not worth a notice
+  const running = !!state && !over && state.phase !== "lobby" && !removed;
+  const hostAway = useAfter(running && hostOnline === null, HOST_AWAY_MS);
 
   if (!session) return <Navigate to={`/?pin=${pin}`} replace />;
 
@@ -154,6 +159,11 @@ export function PlayerGame() {
       }
     >
       <section className="player">
+        {hostAway && !lost && (
+          <p className="host-away" role="status">
+            {t("player.hostAway")}
+          </p>
+        )}
         {computing && !removed && (
           <p className="computing" role="status">
             {t("common.computing")}
@@ -168,6 +178,21 @@ export function PlayerGame() {
       </section>
     </Layout>
   );
+}
+
+/** The host's screen has to be gone this long before the players are told. */
+export const HOST_AWAY_MS = 10_000;
+
+/** true once `cond` has held for `ms` in a row. */
+function useAfter(cond: boolean, ms: number): boolean {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setDone(false);
+    if (!cond) return;
+    const id = setTimeout(() => setDone(true), ms);
+    return () => clearTimeout(id);
+  }, [cond, ms]);
+  return cond && done;
 }
 
 type Submission =

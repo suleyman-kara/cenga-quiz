@@ -25,6 +25,7 @@ vi.mock("../game/hooks", () => ({
   useServerNow: vi.fn(),
   useMyPlayer: vi.fn(),
   useBanned: vi.fn(),
+  useHostOnline: vi.fn(),
 }));
 const conn = vi.hoisted(() => ({ lost: false }));
 vi.mock("../game/connection", () => ({ useConnectionLost: () => conn.lost }));
@@ -78,6 +79,7 @@ describe("PlayerGame", () => {
     vi.mocked(submitAnswer).mockReset().mockResolvedValue(undefined);
     vi.mocked(fetchOwnAnswer).mockReset().mockResolvedValue(null);
     conn.lost = false;
+    vi.mocked(hooks.useHostOnline).mockReturnValue(true);
   });
 
   it("sends players without a session for this PIN back to the join screen", async () => {
@@ -611,6 +613,39 @@ describe("PlayerGame", () => {
     const live = document.querySelector("[data-phase-announcer]");
     expect(live).toHaveAttribute("aria-live", "polite");
     expect(live).toHaveTextContent(`${t("player.questionN", { n: 1 })}: Başkent?`);
+  });
+
+  describe("host connection", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("tells the players when the host has been gone for a while during the game", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.mocked(hooks.useGameState).mockReturnValue(state("question"));
+      vi.mocked(hooks.useHostOnline).mockReturnValue(null);
+      renderPlay();
+      expect(screen.queryByText(t("player.hostAway"))).not.toBeInTheDocument();
+      await act(async () => void (await vi.advanceTimersByTimeAsync(10_500)));
+      expect(screen.getByText(t("player.hostAway"))).toBeInTheDocument();
+    });
+
+    it("no notice while the host is connected, in the lobby, or once the game ended", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.mocked(hooks.useGameState).mockReturnValue(state("reveal"));
+      const { unmount } = renderPlay();
+      await act(async () => void (await vi.advanceTimersByTimeAsync(11_000)));
+      expect(screen.queryByText(t("player.hostAway"))).not.toBeInTheDocument();
+      unmount();
+      vi.mocked(hooks.useHostOnline).mockReturnValue(null);
+      for (const phase of ["lobby", "ended"] as const) {
+        vi.mocked(hooks.useGameState).mockReturnValue(state(phase, phase === "lobby" ? -1 : 0));
+        const v = renderPlay();
+        await act(async () => void (await vi.advanceTimersByTimeAsync(11_000)));
+        expect(screen.queryByText(t("player.hostAway"))).not.toBeInTheDocument();
+        v.unmount();
+      }
+    });
   });
 });
 

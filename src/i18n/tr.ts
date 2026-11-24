@@ -202,6 +202,7 @@ export const tr: Messages = {
   "player.secondsLeft": "{seconds} saniye kaldı",
   "player.offlineAnswerHint": "Bağlantı yok. Seçtiğin cevap bağlantı gelince gönderilecek.",
   "player.sendingOffline": "Bağlantı bekleniyor. Cevabın bağlanınca gönderilecek.",
+  "player.hostAway": "Sunucunun bağlantısı koptu. Oyun kaldığı yerden devam edecek, ayrılma.",
   "player.sending": "Gönderiliyor…",
   "player.sendFailed": "Cevabın gönderilemedi. Tekrar dokun.",
   "player.answerRejected": "Süre doldu / cevap alınamadı",

@@ -65,6 +65,8 @@ export async function createGame(auth: AuthLike | undefined, data: unknown): Res
     return res.committed;
   }, securePin);
 
+  // the cleanup job walks this index instead of downloading every room
+  await db.ref(`gameIndex/${pin}`).set(now);
   const live: LiveGameDoc = { pin, hostUid: uid, quizId, quiz: v.quiz, createdAt: now };
   try {
     await fs.doc(`liveGames/${pin}`).set(live);

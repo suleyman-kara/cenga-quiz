@@ -17,6 +17,7 @@ import { displayPlayers, type DisplayPlayer } from "../host/displayNames";
 import { allPlayersAnswered, answeredCount, revealDue, useAutoReveal } from "../host/useAutoReveal";
 import { useWakeLock } from "../host/useWakeLock";
 import { useStageShortcuts } from "../host/shortcuts";
+import { useHostPresence } from "../game/presence";
 import { useStageSounds } from "../host/useStageSounds";
 import { SoundLevelsControl, SoundOffBanner } from "../host/StageSoundControls";
 import { withRetry } from "../host/retry";
@@ -62,6 +63,8 @@ function BigScreen({ pin }: { pin: string }) {
   const now = useServerNow();
   const lost = useConnectionLost();
   const awake = useWakeLock(state?.phase !== "ended");
+  // phones show "the host lost connection" when this flag disappears mid-game
+  useHostPresence(pin, !!state && state.phase !== "ended");
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

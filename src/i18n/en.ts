@@ -200,6 +200,7 @@ export const en = {
   "player.secondsLeft": "{seconds} seconds left",
   "player.offlineAnswerHint": "No connection. Your answer will be sent when it's back.",
   "player.sendingOffline": "Waiting for the connection. Your answer will be sent when it's back.",
+  "player.hostAway": "The host lost connection. The game will continue where it stopped, so don't leave.",
   "player.sending": "Sending…",
   "player.sendFailed": "Your answer couldn't be sent. Tap again.",
   "player.answerRejected": "Time's up / answer not received",
